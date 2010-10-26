@@ -110,7 +110,7 @@ public:
 private:
   MesosSchedulerDriver* driver;
   Scheduler* sched;
-  FrameworkID fid;
+  FrameworkID frameworkId;
   string frameworkName;
   ExecutorInfo execInfo;
   int32_t generation;
@@ -126,12 +126,12 @@ private:
 public:
   SchedulerProcess(MesosSchedulerDriver* _driver,
                    Scheduler* _sched,
-		   FrameworkID _fid,
+		   FrameworkID _frameworkId,
                    const string& _frameworkName,
                    const ExecutorInfo& _execInfo)
     : driver(_driver),
       sched(_sched),
-      fid(_fid),
+      frameworkId(_frameworkId),
       frameworkName(_frameworkName),
       execInfo(_execInfo),
       generation(0),
@@ -184,13 +184,14 @@ protected:
 	master = masterPid;
 	link(master);
 
-	if (fid == "") {
+	if (frameworkId == "") {
 	  // Touched for the very first time.
 	  send(master, pack<F2M_REGISTER_FRAMEWORK>(frameworkName, user, execInfo));
 	} else {
 	  // Not the first time, or failing over.
-	  send(master, pack<F2M_REREGISTER_FRAMEWORK>(fid, frameworkName, user,
-						      execInfo, generation++));
+	  send(master,
+               pack<F2M_REREGISTER_FRAMEWORK>(frameworkId, frameworkName, user,
+                                              execInfo, generation++));
 	}
 	break;
       }
@@ -204,8 +205,8 @@ protected:
       }
 
       case M2F_REGISTER_REPLY: {
-        tie(fid) = unpack<M2F_REGISTER_REPLY>(body());
-        invoke(bind(&Scheduler::registered, sched, driver, fid));
+        tie(frameworkId) = unpack<M2F_REGISTER_REPLY>(body());
+        invoke(bind(&Scheduler::registered, sched, driver, frameworkId));
         break;
       }
 
@@ -246,20 +247,23 @@ protected:
 	  spawn(rr);
 	}
         
-        send(master, pack<F2M_SLOT_OFFER_REPLY>(fid, oid, tasks, params));
+        send(master,
+             pack<F2M_SLOT_OFFER_REPLY>(frameworkId, oid, tasks, params));
         break;
       }
 
       case F2F_FRAMEWORK_MESSAGE: {
         FrameworkMessage msg;
         tie(msg) = unpack<F2F_FRAMEWORK_MESSAGE>(body());
-        VLOG(1) << "Asked to send framework message to slave " << msg.slaveId;
+        VLOG(1) << "Asked to send framework message to slave "
+                << msg.slaveId;
         if (savedSlavePids.count(msg.slaveId) > 0) {
           VLOG(1) << "Saved slave PID is " << savedSlavePids[msg.slaveId];
-          send(savedSlavePids[msg.slaveId], pack<M2S_FRAMEWORK_MESSAGE>(fid, msg));
+          send(savedSlavePids[msg.slaveId],
+               pack<M2S_FRAMEWORK_MESSAGE>(frameworkId, msg));
         } else {
           VLOG(1) << "No PID is saved for that slave; sending through master";
-          send(master, pack<F2M_FRAMEWORK_MESSAGE>(fid, msg));
+          send(master, pack<F2M_FRAMEWORK_MESSAGE>(frameworkId, msg));
         }
         break;
       }
@@ -280,12 +284,13 @@ protected:
 //         unpack<M2F_FT_STATUS_UPDATE>(tid, state, data);
       case S2M_FT_STATUS_UPDATE: {
 	SlaveID sid;
-	FrameworkID fid;
+	FrameworkID frameworkId;
 	TaskID tid;
 	TaskState state;
 	string data;
 
-	tie(sid, fid, tid, state, data) = unpack<S2M_FT_STATUS_UPDATE>(body());
+	tie(sid, frameworkId, tid, state, data) =
+          unpack<S2M_FT_STATUS_UPDATE>(body());
 
         if (duplicate()) {
           VLOG(1) << "Received a duplicate status update for tid " << tid
@@ -422,7 +427,7 @@ void Scheduler::error(SchedulerDriver* driver, int code, const string &message)
 
 MesosSchedulerDriver::MesosSchedulerDriver(Scheduler* sched,
 					   const string &url,
-					   FrameworkID fid)
+					   FrameworkID frameworkId)
 {
   Configurator configurator;
   local::registerOptions(&configurator);
@@ -435,13 +440,13 @@ MesosSchedulerDriver::MesosSchedulerDriver(Scheduler* sched,
     conf = new Params();
   }
   conf->set("url", url); // Override URL param with the one from the user
-  init(sched, conf, fid);
+  init(sched, conf, frameworkId);
 }
 
 
 MesosSchedulerDriver::MesosSchedulerDriver(Scheduler* sched,
 					   const map<std::string, std::string> &params,
-					   FrameworkID fid)
+					   FrameworkID frameworkId)
 {
   Configurator configurator;
   local::registerOptions(&configurator);
@@ -452,14 +457,14 @@ MesosSchedulerDriver::MesosSchedulerDriver(Scheduler* sched,
     sched->error(this, 2, message);
     conf = new Params();
   }
-  init(sched, conf, fid);
+  init(sched, conf, frameworkId);
 }
 
 
 MesosSchedulerDriver::MesosSchedulerDriver(Scheduler* sched,
 					   int argc,
                                            char** argv,
-					   FrameworkID fid)
+					   FrameworkID frameworkId)
 {
   Configurator configurator;
   local::registerOptions(&configurator);
@@ -470,17 +475,17 @@ MesosSchedulerDriver::MesosSchedulerDriver(Scheduler* sched,
     sched->error(this, 2, message);
     conf = new Params();
   }
-  init(sched, conf, fid);
+  init(sched, conf, frameworkId);
 }
 
 
 void MesosSchedulerDriver::init(Scheduler* _sched,
                                 Params* _conf,
-                                FrameworkID _fid)
+                                FrameworkID _frameworkId)
 {
   sched = _sched;
   conf = _conf;
-  fid = _fid;
+  frameworkId = _frameworkId;
   url = conf->get<string>("url", "local");
   process = NULL;
   detector = NULL;
@@ -542,9 +547,18 @@ int MesosSchedulerDriver::start()
   }
 
   const string& frameworkName = sched->getFrameworkName(this);
-  const ExecutorInfo& executorInfo = sched->getExecutorInfo(this);
 
-  process = new SchedulerProcess(this, sched, fid, frameworkName, executorInfo);
+  if (frameworkName == "")
+    return -1;
+
+  const ExecutorInfo& execInfo = sched->getExecutorInfo(this);
+
+  if (execInfo.uri == "")
+    return -1;
+
+  process =
+    new SchedulerProcess(this, sched, frameworkId, frameworkName, execInfo);
+
   PID pid = Process::spawn(process);
 
   // Check and see if we need to launch a local cluster.
@@ -576,7 +590,7 @@ int MesosSchedulerDriver::stop()
 
   // TODO(benh): Do a Process::post instead?
   process->send(process->master,
-                pack<F2M_UNREGISTER_FRAMEWORK>(process->fid));
+                pack<F2M_UNREGISTER_FRAMEWORK>(process->frameworkId));
 
   process->terminate = true;
 
@@ -617,7 +631,7 @@ int MesosSchedulerDriver::killTask(TaskID tid)
   // TODO(benh): Do a Process::post instead?
 
   process->send(process->master,
-                pack<F2M_KILL_TASK>(process->fid, tid));
+                pack<F2M_KILL_TASK>(process->frameworkId, tid));
 
   return 0;
 }
@@ -655,7 +669,7 @@ int MesosSchedulerDriver::reviveOffers()
   // TODO(benh): Do a Process::post instead?
 
   process->send(process->master,
-                pack<F2M_REVIVE_OFFERS>(process->fid));
+                pack<F2M_REVIVE_OFFERS>(process->frameworkId));
 
   return 0;
 }
@@ -798,9 +812,9 @@ public:
     sched->framework_message(sched, &c_message);
   }
 
-  virtual void slaveLost(SchedulerDriver*, SlaveID sid)
+  virtual void slaveLost(SchedulerDriver*, SlaveID slaveId)
   {
-    sched->slave_lost(sched, sid.c_str());
+    sched->slave_lost(sched, slaveId.c_str());
   }
 
   virtual void error(SchedulerDriver*, int code, const std::string &message)

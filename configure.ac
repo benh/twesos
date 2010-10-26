@@ -80,13 +80,10 @@ AC_ARG_WITH([java-home],
   AC_HELP_STRING([--with-java-home=DIR],
                  [find Java Development Kit in DIR]),
 	         [case "$with_java_home" in
-		    yes) 
-                      AC_MSG_ERROR([
+		    yes) AC_MSG_ERROR([
 *** --with-java-home requires an argument]) ;;
-		    *)
-                      JAVA_HOME="$withval"
-                      HAS_JAVA="1"
-                      ;;
+		    *) JAVA_HOME="$withval"
+                       HAS_JAVA="1" ;;
 	          esac],
 	         [])
 AC_SUBST(JAVA_HOME)
@@ -99,15 +96,12 @@ AC_ARG_WITH([python-headers],
   AC_HELP_STRING([--with-python-headers=DIR],
                  [find Python headers in DIR]),
 	         [case "$with_python_headers" in
-		    yes)
-                      AC_MSG_ERROR([
+		    yes) AC_MSG_ERROR([
 *** --with-python-headers requires an argument]) ;;
-		    *)
-                      PYTHON_HEADERS="$withval"
-                      echo running $PYTHON to find compiler flags for creating the Mesos Python library...
-                      PYTHON_LDFLAGS=`$PYTHON -c 'from distutils import sysconfig; print sysconfig.get_config_var("LINKFORSHARED") + " -lpython" + sysconfig.get_config_var("VERSION")'`
-                      HAS_PYTHON="1"
-                      ;;
+		    *) PYTHON_HEADERS="$withval"
+                       echo running $PYTHON to find compiler flags for creating the Mesos Python library...
+                       PYTHON_LDFLAGS=`$PYTHON -c 'from distutils import sysconfig; print sysconfig.get_config_var("LINKFORSHARED") + " -lpython" + sysconfig.get_config_var("VERSION")'`
+                       HAS_PYTHON="1" ;;
 	          esac],
 	         [])
 AC_SUBST(PYTHON_HEADERS)

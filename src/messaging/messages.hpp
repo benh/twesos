@@ -459,6 +459,18 @@ void operator & (process::tuples::deserializer&, slave::state::SlaveState *&);
 
 /* Serialization functions for various Mesos data types. */
 
+void operator & (process::tuples::serializer&, const bytes&);
+void operator & (process::tuples::deserializer&, bytes&);
+
+void operator & (process::tuples::serializer&, const FrameworkID&);
+void operator & (process::tuples::deserializer&, FrameworkID&);
+
+void operator & (process::tuples::serializer&, const SlaveID&);
+void operator & (process::tuples::deserializer&, SlaveID&);
+
+void operator & (process::tuples::serializer&, const OfferID&);
+void operator & (process::tuples::deserializer&, OfferID&);
+
 void operator & (process::tuples::serializer&, const TaskState&);
 void operator & (process::tuples::deserializer&, TaskState&);
 

@@ -120,10 +120,11 @@ SLAVE_SWIG_WEBUI_OBJ = webui/slave/swig/slave_wrap.o
 WEBUI_OBJ = $(MASTER_WEBUI_OBJ) $(SLAVE_WEBUI_OBJ)
 SWIG_WEBUI_OBJ = $(MASTER_SWIG_WEBUI_OBJ) $(SLAVE_SWIG_WEBUI_OBJ)
 
-COMMON_OBJ = common/fatal.o messaging/messages.o common/lock.o		\
-	     detector/detector.o common/params.o			\
+COMMON_OBJ = common/mesos_types.o common/fatal.o messaging/messages.o	\
+	     common/lock.o detector/detector.o common/params.o		\
 	     detector/url_processor.o configurator/configurator.o	\
-	     common/string_utils.o common/logging.o common/date_utils.o
+	     common/string_utils.o common/logging.o			\
+	     common/date_utils.o
 
 ifeq ($(WITH_ZOOKEEPER),1)
   COMMON_OBJ += detector/zookeeper.o
@@ -166,7 +167,6 @@ MESOS_EXEC_LIB = $(LIBDIR)/libmesos_exec.a
 
 # C/C++ shared library which contains both the scheduler and executor
 # libraries, in addition to libglog, libprocess, and libev.
-MESOS_LIB_OBJ = 
 ifeq ($(OS_NAME),darwin)
   MESOS_LIB = $(LIBDIR)/libmesos.dylib
 else
@@ -175,10 +175,13 @@ endif
 
 MESOS_LIBS = $(MESOS_LIB) $(MESOS_SCHED_LIB) $(MESOS_EXEC_LIB)
 
-# Java and Python shared libraries which contain the everything in
-# MESOS_LIB as well as the SWIG wrappers (note, Java requires the use
-# of the .dylib suffix on Mac OS X, but at the time Python required
-# the .so suffix even on Mac OS X).
+MESOS_JAVA_LIB_OBJ = java/jni/convert.o java/jni/construct.o	\
+	             java/jni/mesos_MesosSchedulerDriver.o	\
+	             java/jni/mesos_MesosExecutorDriver.o
+
+# Note the Java and Python shared libraries embed MESOS_LIB (Java
+# requires the .dylib suffix on Mac OS X, while Python uses the .so
+# suffix, even on Mac OS X).
 ifeq ($(OS_NAME),darwin)
   MESOS_JAVA_LIB = $(LIBDIR)/java/libmesos.dylib
 else
@@ -299,20 +302,22 @@ java: $(MESOS_JAVA_LIB) $(MESOS_JAVA_JAR)
 
 python: $(MESOS_PYTHON_LIB)
 
-$(MESOS_JAVA_JAR): $(MESOS_JAVA_LIB) | $(LIBDIR)/java
+$(MESOS_JAVA_JAR): @srcdir@/java/src/mesos/*.java | $(LIBDIR)/java
 ifdef JAVA_HOME
-	patch -N swig/java/mesos/mesosJNI.java < @srcdir@/swig/java/mesosJNI.java.patch1 || echo -n
-	patch swig/java/mesos/mesosJNI.java < @srcdir@/swig/java/mesosJNI.java.patch2 || echo -n
-	$(JAVA_HOME)/bin/javac -sourcepath swig/java -d swig/java swig/java/mesos/*.java
-	$(JAVA_HOME)/bin/jar cf $@ -C swig/java mesos
+	rm -f java/classes/mesos/*
+	mkdir -p java/classes/mesos
+	$(JAVA_HOME)/bin/javac -sourcepath @srcdir@/java/src -d java/classes @srcdir@/java/src/mesos/*.java
+	$(JAVA_HOME)/bin/jar cf $@ -C java/classes mesos
+	$(JAVA_HOME)/bin/javah -d java/jni -classpath java/classes mesos.MesosSchedulerDriver
+	$(JAVA_HOME)/bin/javah -d java/jni -classpath java/classes mesos.MesosExecutorDriver
 endif
 
-$(MESOS_JAVA_LIB): @srcdir@/swig/mesos.i $(MESOS_SCHED_LIB) $(MESOS_EXEC_LIB) | $(LIBDIR)/java
+$(MESOS_JAVA_LIB_OBJ): %.o: @srcdir@/%.cpp $(MESOS_JAVA_JAR)
+	$(CXX) -c $(CXXFLAGS) -Ijava/jni -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/$(OS_NAME) -o $@ $<
+
+$(MESOS_JAVA_LIB): $(MESOS_JAVA_LIB_OBJ) $(MESOS_SCHED_LIB) $(MESOS_EXEC_LIB) | $(LIBDIR)/java
 ifdef JAVA_HOME
-	rm -f swig/java/mesos/*
-	mkdir -p swig/java/mesos
-	$(SWIG) -c++ -java -I@top_srcdir@/include -o swig/java/mesos_wrap.cpp -outdir swig/java/mesos -package mesos @srcdir@/swig/mesos.i
-	$(CXX) $(CXXFLAGS) -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/$(OS_NAME) -shared -o $@ swig/java/mesos_wrap.cpp $(MESOS_SCHED_LIB) $(MESOS_EXEC_LIB) $(LDFLAGS) $(LIBS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(MESOS_JAVA_LIB_OBJ) $(MESOS_SCHED_LIB) $(MESOS_EXEC_LIB) $(LDFLAGS) $(LIBS)
 endif
 
 $(MESOS_PYTHON_LIB): @srcdir@/swig/mesos.i $(MESOS_SCHED_LIB) $(MESOS_EXEC_LIB) | $(LIBDIR)/python
@@ -320,7 +325,7 @@ ifdef PYTHON_HEADERS
 	mkdir -p swig/python
 	$(SWIG) -c++ -python -threads -I@top_srcdir@/include -o swig/python/mesos_wrap.cpp -outdir swig/python @srcdir@/swig/mesos.i
 	$(CXX) $(CXXFLAGS) -I$(PYTHON_HEADERS) -shared -o $@ swig/python/mesos_wrap.cpp $(MESOS_SCHED_LIB) $(MESOS_EXEC_LIB) $(LDFLAGS) $(PYTHON_LDFLAGS) $(LIBS)
-	cp -r swig/python/mesos.py $(LIBDIR)/python/mesos.py
+	mv swig/python/mesos.py $(LIBDIR)/python/mesos.py
 endif
 
 $(WEBUI_FILES): $(BINDIR)/%: @srcdir@/% | $(WEBUI_DIRECTORIES)
@@ -350,18 +355,19 @@ clean:
 	rm -f $(ALL_OBJ)
 	rm -f $(MESOS_EXES) $(MESOS_LIBS)
 	rm -f $(MESOS_JAVA_JAR)
+	rm -f $(patsubst %.o, %.d, $(MESOS_JAVA_LIB_OBJ))
+	rm -f $(MESOS_JAVA_LIB_OBJ)
 	rm -rf $(patsubst %.so, %.d, $(MESOS_JAVA_LIB))
 	rm -rf $(patsubst %.dylib, %.d, $(MESOS_JAVA_LIB))
 	rm -rf $(patsubst %.so, %.d, $(MESOS_PYTHON_LIB))
-	rm -rf $(MESOS_JAVA_LIB).dSYM $(MESOS_PYTHON_LIB).dSYM
-	rm -f $(MESOS_JAVA_LIB) $(MESOS_PYTHON_LIB)
-	rm -rf $(WEBUI_FILES)
-	rm -f swig/*/mesos_wrap.cpp
-	rm -f swig/*/mesos_wrap.h
-	rm -f swig/*/*.o
-	rm -f swig/*/*.d
-	rm -f swig/java/mesos/*
-	rm -f swig/python/mesos.py
+	rm -f $(MESOS_JAVA_LIB)
+	rm -rf $(MESOS_JAVA_LIB).dSYM
+	rm -rf java/classes
+	rm -f java/jni/mesos_MesosSchedulerDriver.h
+	rm -f java/jni/mesos_MesosExecutorDriver.h
+	rm -f $(MESOS_PYTHON_LIB)
+	rm -rf $(MESOS_PYTHON_LIB).dSYM
+	rm -rf swig/python
 	rm -f $(LIBDIR)/python/mesos.py
 	rm -f $(LIBDIR)/python/mesos.pyc
 	rm -f webui/master/swig/master_wrap.h
@@ -376,9 +382,10 @@ clean:
 	rm -f webui/slave/swig/slave_wrap.o
 	rm -f webui/slave/swig/slave_wrap.d
 	rm -f webui/slave/swig/slave.py
-	rm -f $(BINDIR)/webui/master/swig/master.py
-	rm -f $(BINDIR)/webui/master/swig/master.pc
+	rm -f $(BINDIR)/webui/slave/swig/slave.py
+	rm -f $(BINDIR)/webui/slave/swig/slave.pc
 	rm -f $(DEPLOY_FILES)
+	rm -rf $(WEBUI_FILES)
 	rm -f TAGS
 
 .PHONY: default java python test all clean

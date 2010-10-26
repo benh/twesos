@@ -84,7 +84,7 @@ void ProcessBasedIsolationModule::killExecutor(Framework* fw)
     // TODO(benh): Consider sending a SIGTERM, then after so much time
     // if it still hasn't exited do a SIGKILL (can use a libprocess
     // process for this).
-    LOG(INFO) << "Sending SIGKILL to gpid " << pgids[fw->id];
+    LOG(INFO) << "Sending SIGKILL to pgid " << pgids[fw->id];
     killpg(pgids[fw->id], SIGKILL);
     pgids[fw->id] = -1;
     fw->executorStatus = "No executor running";
@@ -140,7 +140,7 @@ void ProcessBasedIsolationModule::Reaper::operator () ()
         foreachpair (FrameworkID fid, pid_t pgid, module->pgids) {
           if (pgid == pid) {
             // Kill the process group to clean up the tasks.
-            LOG(INFO) << "Sending SIGKILL to gpid " << pgid;
+            LOG(INFO) << "Sending SIGKILL to pgid " << pgid;
             killpg(pgid, SIGKILL);
             module->pgids[fid] = -1;
             LOG(INFO) << "Telling slave of lost framework " << fid;

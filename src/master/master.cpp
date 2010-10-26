@@ -897,7 +897,7 @@ void Master::launchTask(Framework *framework, const TaskDescription& t)
   LOG(INFO) << "Launching " << task << " on " << slave;
   send(slave->pid, pack<M2S_RUN_TASK>(
         framework->id, t.taskId, framework->name, framework->user,
-        framework->executorInfo, t.name, t.arg, t.params, framework->pid));
+        framework->executorInfo, t.name, t.data, t.params, framework->pid));
 }
 
 

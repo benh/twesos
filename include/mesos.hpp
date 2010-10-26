@@ -9,14 +9,26 @@
 
 namespace mesos {
 
-// Various Mesos structs that include binary data, such as task descriptions,
-// use a std::string to hold it so they can conveniently store the size as
-// well as the data in one object. We typedef such strings as bytes
-// for two reasons:
-// 1) It makes the purpose of fields (human-readable vs opaque) apparent.
-// 2) It makes it possible to specify a different typemap for these strings
-//    in SWIG code (e.g. to map them to byte[]'s in Java).
-typedef std::string bytes;
+
+struct bytes
+{
+  bytes(const char *data = "")
+    : s(data) {}
+
+  bytes(const std::string &data)
+    : s(data) {}
+
+  bytes(const void *data, size_t length)
+    : s((const char *) data, length) {}
+
+  operator std::string () const { return s; }
+
+  const char * data() const { return s.data(); }
+
+  size_t size() const { return s.size(); }
+
+  std::string s;
+};
 
 
 struct TaskDescription
@@ -25,15 +37,23 @@ struct TaskDescription
 
   TaskDescription(TaskID _taskId, SlaveID _slaveId, const std::string& _name,
                   const std::map<std::string, std::string>& _params,
-                  const bytes& _arg)
+                  const bytes& _data)
     : taskId(_taskId), slaveId(_slaveId), name(_name),
-      params(_params), arg(_arg) {}
+      params(_params), data(_data) {}
+
+  TaskDescription(TaskID _taskId, SlaveID _slaveId, const std::string& _name,
+                  const std::map<std::string, std::string>& _params)
+    : taskId(_taskId), slaveId(_slaveId), name(_name), params(_params) {}
+
+  TaskDescription(TaskID _taskId, SlaveID _slaveId, const std::string& _name,
+                  const bytes& _data)
+    : taskId(_taskId), slaveId(_slaveId), name(_name), data(_data) {}
 
   TaskID taskId;
   SlaveID slaveId;
   std::string name;
   std::map<std::string, std::string> params;
-  bytes arg;
+  bytes data;
 };
 
 
@@ -81,7 +101,7 @@ struct FrameworkMessage
 /**
  * Information used to launch an executor for a framework.
  * This contains an URI to the executor, which may be either an absolute path
- * on a shared file system or a hdfs:// URI, as well as an opaque initArg
+ * on a shared file system or a hdfs:// URI, as well as some opaque data
  * passed to the executor's init() callback.
  * In addition, for both local and HDFS executor URIs, Mesos supports packing
  * up multiple files in a .tgz. In this case, the .tgz should contain a single
@@ -91,17 +111,24 @@ struct FrameworkMessage
 struct ExecutorInfo
 {
   ExecutorInfo() {}
-  
-  ExecutorInfo(const std::string& _uri, const bytes& _initArg)
-    : uri(_uri), initArg(_initArg) {}
-  
-  ExecutorInfo(const std::string& _uri, const bytes& _initArg,
+
+  ExecutorInfo(const std::string& _uri, const bytes& _data,
                const std::map<std::string, std::string>& _params)
-    : uri(_uri), initArg(_initArg), params(_params) {}
+    : uri(_uri), data(_data), params(_params) {}
+
+  ExecutorInfo(const std::string& _uri,
+               const std::map<std::string, std::string>& _params)
+    : uri(_uri), params(_params) {}
+
+  ExecutorInfo(const std::string& _uri, const bytes& _data)
+    : uri(_uri), data(_data) {}
+
+  ExecutorInfo(const std::string& _uri)
+    : uri(_uri) {}
 
   std::string uri;
-  bytes initArg;
   std::map<std::string, std::string> params;
+  bytes data;
 };
 
 

@@ -47,7 +47,7 @@ public:
     int64_t memToHog;
     double duration;
     int numThreads;
-    istringstream in(task.arg);
+    istringstream in(task.data);
     in >> memToHog >> duration >> numThreads;
     memToHog *= 1024LL * 1024LL; // Convert from MB to bytes
     for (int i = 0; i < numThreads; i++) {

@@ -27,19 +27,19 @@ public:
   virtual ~Scheduler() {}
 
   // Callbacks for getting framework properties
-  virtual std::string getFrameworkName(SchedulerDriver*);
-  virtual ExecutorInfo getExecutorInfo(SchedulerDriver*);
+  virtual std::string getFrameworkName(SchedulerDriver* d);
+  virtual ExecutorInfo getExecutorInfo(SchedulerDriver* d);
 
   // Callbacks for various Mesos events
-  virtual void registered(SchedulerDriver* d, FrameworkID fid) {}
+  virtual void registered(SchedulerDriver* d, FrameworkID frameworkId) {}
   virtual void resourceOffer(SchedulerDriver* d,
-                             OfferID oid,
+                             OfferID offerId,
                              const std::vector<SlaveOffer>& offers) {}
-  virtual void offerRescinded(SchedulerDriver* d, OfferID oid) {}
+  virtual void offerRescinded(SchedulerDriver* d, OfferID offerId) {}
   virtual void statusUpdate(SchedulerDriver* d, const TaskStatus& status) {}
   virtual void frameworkMessage(SchedulerDriver* d,
                                 const FrameworkMessage& message) {}
-  virtual void slaveLost(SchedulerDriver* d, SlaveID sid) {}
+  virtual void slaveLost(SchedulerDriver* d, SlaveID slaveId) {}
   virtual void error(SchedulerDriver* d, int code, const std::string& message);
 };
 
@@ -65,10 +65,12 @@ public:
 
   // Communication methods
   virtual int sendFrameworkMessage(const FrameworkMessage& message) { return -1; }
-  virtual int killTask(TaskID tid) { return -1; }
-  virtual int replyToOffer(OfferID oid,
-			   const std::vector<TaskDescription>& task,
+  virtual int killTask(TaskID taskId) { return -1; }
+  virtual int replyToOffer(OfferID offerId,
+			   const std::vector<TaskDescription>& tasks,
 			   const std::map<std::string, std::string>& params) { return -1; }
+  virtual int replyToOffer(OfferID offerId,
+                          const std::vector<TaskDescription>& tasks) { return -1; }
   virtual int reviveOffers() { return -1; }
   virtual int sendHints(const std::map<std::string, std::string>& hints) { return -1; }
 };
@@ -83,53 +85,54 @@ class MesosSchedulerDriver : public SchedulerDriver
 public:
   /**
    * Create a scheduler driver with a given Mesos master URL.
-   * Additional Mesos config options are read from the environment, as well
-   * as any config files found through it.
+   * Additional Mesos config options are read from the environment, as
+   * well as any config files found through it. If a framework ID is
+   * set than consider this scheduler a failover.
    *
    * @param sched scheduler to make callbacks into
    * @param url Mesos master URL
-   * @param fid optional framework ID for registering redundant schedulers
-   *            for the same framework
+   * @param frameworkId optional framework ID for scheduler failover
    */
   MesosSchedulerDriver(Scheduler* sched,
 		       const std::string& url,
-		       FrameworkID fid = "");
+		       FrameworkID frameworkId = "");
 
   /**
-   * Create a scheduler driver with a configuration, which the master URL
-   * and possibly other options are read from.
-   * Additional Mesos config options are read from the environment, as well
-   * as any config files given through conf or found in the environment.
+   * Create a scheduler driver with a configuration, which the master
+   * URL and possibly other options are read from.  Additional Mesos
+   * config options are read from the environment, as well as any
+   * config files given through conf or found in the environment. If a
+   * framework ID is set than consider this scheduler a failover.
    *
    * @param sched scheduler to make callbacks into
    * @param params Map containing configuration options
-   * @param fid optional framework ID for registering redundant schedulers
-   *            for the same framework
+   * @param frameworkId optional framework ID for scheduler failover
    */
   MesosSchedulerDriver(Scheduler* sched,
 		       const std::map<std::string, std::string>& params,
-		       FrameworkID fid = "");
+		       FrameworkID frameworkId = "");
 
 #ifndef SWIG
   /**
-   * Create a scheduler driver with a config read from command-line arguments.
-   * Additional Mesos config options are read from the environment, as well
-   * as any config files given through conf or found in the environment.
+   * Create a scheduler driver with a config read from command-line
+   * arguments.  Additional Mesos config options are read from the
+   * environment, as well as any config files given through conf or
+   * found in the environment. If a framework ID is set than consider
+   * this scheduler a failover.
    *
-   * This constructor is not available through SWIG since it's difficult
-   * for it to properly map arrays to an argc/argv pair.
+   * This constructor is not available through SWIG since it's
+   * difficult for it to properly map arrays to an argc/argv pair.
    *
    * @param sched scheduler to make callbacks into
    * @param argc argument count
    * @param argv argument values (argument 0 is expected to be program name
    *             and will not be looked at for options)
-   * @param fid optional framework ID for registering redundant schedulers
-   *            for the same framework
+   * @param frameworkId optional framework ID for scheduler failover
    */
   MesosSchedulerDriver(Scheduler* sched,
 		       int argc,
                        char** argv,
-		       FrameworkID fid = "");
+		       FrameworkID frameworkId = "");
 #endif
 
   virtual ~MesosSchedulerDriver();
@@ -142,26 +145,27 @@ public:
 
   // Communication methods
   virtual int sendFrameworkMessage(const FrameworkMessage& message);
-  virtual int killTask(TaskID tid);
+  virtual int killTask(TaskID taskId);
   virtual int replyToOffer(OfferID offerId,
-			   const std::vector<TaskDescription>& task,
+			   const std::vector<TaskDescription>& tasks,
 			   const std::map<std::string, std::string>& params);
+  virtual int replyToOffer(OfferID offerId,
+                           const std::vector<TaskDescription>& tasks) {
+    return replyToOffer(offerId, tasks, std::map<std::string, std::string>());
+  }
   virtual int reviveOffers();
   virtual int sendHints(const std::map<std::string, std::string>& hints);
 
-  // Scheduler getter; required by some of the SWIG proxies
-  virtual Scheduler* getScheduler() { return sched; }
-
 private:
   // Initialization method used by constructors
-  void init(Scheduler* sched, internal::Params* conf, FrameworkID fid);
+  void init(Scheduler* sched, internal::Params* conf, FrameworkID frameworkId);
 
   // Internal utility method to report an error to the scheduler
   void error(int code, const std::string& message);
 
   Scheduler* sched;
   std::string url;
-  FrameworkID fid;
+  FrameworkID frameworkId;
 
   // LibProcess process for communicating with master
   internal::SchedulerProcess* process;
@@ -181,7 +185,6 @@ private:
 
   // Condition variable for waiting until driver terminates
   pthread_cond_t cond;
-
 };
 
 
