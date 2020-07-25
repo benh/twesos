@@ -25,11 +25,11 @@ config = [ (50, 120),
            (50, 120) ]
 
 class ScalingScheduler(mesos.Scheduler):
-  def __init__(self, master):
+  def __init__(self, main):
     mesos.Scheduler.__init__(self)
     self.tid = 0
-    self.master = master
-    print self.master
+    self.main = main
+    print self.main
     self.running = {}
 
   def getFrameworkName(self, driver):
@@ -45,7 +45,7 @@ class ScalingScheduler(mesos.Scheduler):
   def resourceOffer(self, driver, oid, offers):
     # Make sure the nested schedulers can actually run their tasks.
     # if len(offers) <= len(config) and len(config) != self.tid:
-    #   print "Need at least one spare slave to do this work ... exiting!"
+    #   print "Need at least one spare subordinate to do this work ... exiting!"
     #   driver.stop()
     #   return
 
@@ -54,14 +54,14 @@ class ScalingScheduler(mesos.Scheduler):
     for offer in offers:
       if len(config) != self.tid:
         (todo, duration) = config[self.tid]
-        arg = pickle.dumps((self.master, (todo, duration)))
+        arg = pickle.dumps((self.main, (todo, duration)))
         pars = {"cpus": "%d" % CPUS, "mem": "%d" % MEM}
-        task = mesos.TaskDescription(self.tid, offer.slaveId,
+        task = mesos.TaskDescription(self.tid, offer.subordinateId,
                                      "task %d" % self.tid, pars, arg)
         tasks.append(task)
         self.running[self.tid] = (todo, duration)
         self.tid += 1
-        print "Launching (%d, %d) on slave %s" % (todo, duration, offer.slaveId)
+        print "Launching (%d, %d) on subordinate %s" % (todo, duration, offer.subordinateId)
     driver.replyToOffer(oid, tasks, {})
 
   def statusUpdate(self, driver, status):

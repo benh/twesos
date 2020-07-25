@@ -56,23 +56,23 @@ class Service:
     """return number of nodes the service wants to remove"""
     raise NotImplementedError
 
-class MasterSlave(Service):
-  """ the base class for a master slave 
+class MainSubordinate(Service):
+  """ the base class for a main subordinate 
   service architecture. """
   def __init__(self, serviceDesc, workDirs,requiredNode):
     Service.__init__(self, serviceDesc, workDirs)
-    self.launchedMaster = False
-    self.masterInitialized = False
-    self.masterAddress = 'none'
+    self.launchedMain = False
+    self.mainInitialized = False
+    self.mainAddress = 'none'
     self.requiredNode = requiredNode
     self.failedMsg = None
-    self.masterFailureCount = 0
+    self.mainFailureCount = 0
 
   def getRequiredNode(self):
     return self.requiredNode
  
-  def getMasterRequest(self):
-    """ the number of master you need
+  def getMainRequest(self):
+    """ the number of main you need
     to run for this service. """
     raise NotImplementedError
   
@@ -81,8 +81,8 @@ class MasterSlave(Service):
     other services. is set to true by default. """
     return True
   
-  def getMasterCommands(self, serviceDict):
-    """ a list of master commands you 
+  def getMainCommands(self, serviceDict):
+    """ a list of main commands you 
     want to run for this service. """
     raise NotImplementedError
 
@@ -96,8 +96,8 @@ class MasterSlave(Service):
     run for this service. """
     raise NotImplementedError
 
-  def setMasterNodes(self, list):
-    """ set the status of master nodes 
+  def setMainNodes(self, list):
+    """ set the status of main nodes 
     after they start running on a node cluster. """
     raise NotImplementedError
 
@@ -106,68 +106,68 @@ class MasterSlave(Service):
     currently. """
     raise NotImplementedError
 
-  def getMasterAddrs(self):
-    """ return the addresses of master. the 
+  def getMainAddrs(self):
+    """ return the addresses of main. the 
     hostname:port to which worker nodes should
     connect. """
     raise NotImplementedError
   
-  def setMasterParams(self, list):
-    """ set the various master params 
+  def setMainParams(self, list):
+    """ set the various main params 
     depending on what each hodring set 
-    the master params to. """
+    the main params to. """
     raise NotImplementedError
 
-  def setlaunchedMaster(self):
-    """ set the status of master launched
+  def setlaunchedMain(self):
+    """ set the status of main launched
     to true. """
-    self.launchedMaster = True
+    self.launchedMain = True
 
-  def isMasterLaunched(self):
-    """ return if a master has been launched
+  def isMainLaunched(self):
+    """ return if a main has been launched
     for the service or not. """
-    return self.launchedMaster
+    return self.launchedMain
 
-  def isMasterInitialized(self):
-    """ return if a master if launched 
+  def isMainInitialized(self):
+    """ return if a main if launched 
     has been initialized or not. """
-    return self.masterInitialized
+    return self.mainInitialized
 
-  def setMasterInitialized(self):
-    """ set the master initialized to
+  def setMainInitialized(self):
+    """ set the main initialized to
     true. """
-    self.masterInitialized = True
-    # Reset failure related variables, as master is initialized successfully.
-    self.masterFailureCount = 0
+    self.mainInitialized = True
+    # Reset failure related variables, as main is initialized successfully.
+    self.mainFailureCount = 0
     self.failedMsg = None
 
-  def getMasterAddress(self):
+  def getMainAddress(self):
     """ it needs to change to reflect 
-    more that one masters. Currently it 
-    keeps a knowledge of where the master 
+    more that one mains. Currently it 
+    keeps a knowledge of where the main 
     was launched and to keep track if it was actually
     up or not. """
-    return self.masterAddress
+    return self.mainAddress
 
-  def setMasterAddress(self, addr):
-    self.masterAddress = addr
+  def setMainAddress(self, addr):
+    self.mainAddress = addr
 
   def isExternal(self):
     return self.serviceDesc.isExternal()
 
-  def setMasterFailed(self, err):
-    """Sets variables related to Master failure"""
-    self.masterFailureCount += 1
+  def setMainFailed(self, err):
+    """Sets variables related to Main failure"""
+    self.mainFailureCount += 1
     self.failedMsg = err
     # When command is sent to HodRings, this would have been set to True.
     # Reset it to reflect the correct status.
-    self.launchedMaster = False
+    self.launchedMain = False
 
-  def getMasterFailed(self):
+  def getMainFailed(self):
     return self.failedMsg
  
-  def getMasterFailureCount(self):
-    return self.masterFailureCount
+  def getMainFailureCount(self):
+    return self.mainFailureCount
  
 class NodeRequest:
   """ A class to define 
@@ -230,7 +230,7 @@ class ServiceUtil:
   
   def getUniqPort(h=None, low=40000, high=60000, retry=900, log=None):
     """get unique port on a host that can be used by service
-    This and its consumer code should disappear when master
+    This and its consumer code should disappear when main
     nodes get allocatet by nodepool"""
 
     # We use a default value of 900 retries, which takes an agreeable

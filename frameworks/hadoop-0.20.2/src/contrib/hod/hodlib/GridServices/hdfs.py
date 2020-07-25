@@ -24,19 +24,19 @@ from hodlib.Hod.nodePool import *
 from hodlib.Common.desc import CommandDesc
 from hodlib.Common.util import get_exception_string, parseEquals
 
-class HdfsExternal(MasterSlave):
+class HdfsExternal(MainSubordinate):
   """dummy proxy to external HDFS instance"""
 
   def __init__(self, serviceDesc, workDirs, version):
-    MasterSlave.__init__(self, serviceDesc, workDirs,None)
-    self.launchedMaster = True
-    self.masterInitialized = True
+    MainSubordinate.__init__(self, serviceDesc, workDirs,None)
+    self.launchedMain = True
+    self.mainInitialized = True
     self.version = version
     
-  def getMasterRequest(self):
+  def getMainRequest(self):
     return None
 
-  def getMasterCommands(self, serviceDict):
+  def getMainCommands(self, serviceDict):
     return []
 
   def getAdminCommands(self, serviceDict):
@@ -45,12 +45,12 @@ class HdfsExternal(MasterSlave):
   def getWorkerCommands(self, serviceDict):
     return []
 
-  def getMasterAddrs(self):
+  def getMainAddrs(self):
     attrs = self.serviceDesc.getfinalAttrs()
     addr = attrs['fs.default.name']
     return [addr]
   
-  def setMasterParams(self, dict):
+  def setMainParams(self, dict):
    self.serviceDesc.dict['final-attrs']['fs.default.name'] = "%s:%s" % \
      (dict['host'], dict['fs_port'])
 
@@ -73,14 +73,14 @@ class HdfsExternal(MasterSlave):
       infoaddr = attrs['dfs.http.address']
     return [infoaddr]
 
-class Hdfs(MasterSlave):
+class Hdfs(MainSubordinate):
 
   def __init__(self, serviceDesc, nodePool, required_node, version, \
                                         format=True, upgrade=False,
                                         workers_per_ring = 1):
-    MasterSlave.__init__(self, serviceDesc, nodePool, required_node)
-    self.masterNode = None
-    self.masterAddr = None
+    MainSubordinate.__init__(self, serviceDesc, nodePool, required_node)
+    self.mainNode = None
+    self.mainAddr = None
     self.runAdminCommands = True
     self.infoAddr = None
     self._isLost = False
@@ -90,22 +90,22 @@ class Hdfs(MasterSlave):
     self.version = version
     self.workers_per_ring = workers_per_ring
 
-  def getMasterRequest(self):
+  def getMainRequest(self):
     req = NodeRequest(1, [], False)
     return req
 
-  def getMasterCommands(self, serviceDict):
+  def getMainCommands(self, serviceDict):
 
-    masterCommands = []
+    mainCommands = []
     if self.format:
-      masterCommands.append(self._getNameNodeCommand(True))
+      mainCommands.append(self._getNameNodeCommand(True))
 
     if self.upgrade:
-      masterCommands.append(self._getNameNodeCommand(False, True))
+      mainCommands.append(self._getNameNodeCommand(False, True))
     else:
-      masterCommands.append(self._getNameNodeCommand(False))
+      mainCommands.append(self._getNameNodeCommand(False))
 
-    return masterCommands
+    return mainCommands
 
   def getAdminCommands(self, serviceDict):
 
@@ -125,12 +125,12 @@ class Hdfs(MasterSlave):
 
     return workerCmds
 
-  def setMasterNodes(self, list):
+  def setMainNodes(self, list):
     node = list[0]
-    self.masterNode = node
+    self.mainNode = node
     
-  def getMasterAddrs(self):
-    return [self.masterAddr]
+  def getMainAddrs(self):
+    return [self.mainAddr]
 
   def getInfoAddrs(self):
     return [self.infoAddr]
@@ -138,13 +138,13 @@ class Hdfs(MasterSlave):
   def getWorkers(self):
     return self.workers
 
-  def setMasterParams(self, list):
+  def setMainParams(self, list):
     dict = self._parseEquals(list)
-    self.masterAddr = dict['fs.default.name']
-    k,v = self.masterAddr.split( ":")
-    self.masterNode = k
+    self.mainAddr = dict['fs.default.name']
+    k,v = self.mainAddr.split( ":")
+    self.mainNode = k
     if self.version < 16:
-      self.infoAddr = self.masterNode + ':' + dict['dfs.info.port']
+      self.infoAddr = self.mainNode + ':' + dict['dfs.info.port']
     else:
       # After Hadoop-2185
       self.infoAddr = dict['dfs.http.address']
@@ -227,7 +227,7 @@ class Hdfs(MasterSlave):
     workDirs = []
     attrs = sd.getfinalAttrs().copy()
     envs = sd.getEnvs().copy()
-    nn = self.masterAddr
+    nn = self.mainAddr
 
     if nn == None:
       raise ValueError, "Can't get namenode address"
@@ -262,7 +262,7 @@ class Hdfs(MasterSlave):
     workDirs = []
     attrs = sd.getfinalAttrs().copy()
     envs = sd.getEnvs().copy()
-    nn = self.masterAddr
+    nn = self.mainAddr
 
     if nn == None:
       raise ValueError, "Can't get namenode address"

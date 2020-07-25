@@ -322,7 +322,7 @@ class baseSocketServer:
     def _serve_forever(self):
         """Replacement for serve_forever loop.
         
-           All baseSocketServers run within a master thread; that thread
+           All baseSocketServers run within a main thread; that thread
            imitates serve_forever, but checks an event (self.__stopForever) 
            before processing new connections.
         """

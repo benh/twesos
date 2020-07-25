@@ -755,18 +755,18 @@ class HodRing(hodBaseService):
       hodBaseService.start(self)
       
       ringXRAddress = None
-      if self._cfg.has_key('ringmaster-xrs-addr'):
-        ringXRAddress = "http://%s:%s/" % (self._cfg['ringmaster-xrs-addr'][0],
-                          self._cfg['ringmaster-xrs-addr'][1])
-        self.log.debug("Ringmaster at %s" % ringXRAddress)
+      if self._cfg.has_key('ringmain-xrs-addr'):
+        ringXRAddress = "http://%s:%s/" % (self._cfg['ringmain-xrs-addr'][0],
+                          self._cfg['ringmain-xrs-addr'][1])
+        self.log.debug("Ringmain at %s" % ringXRAddress)
 
       self.log.debug("Creating service registry XML-RPC client.")
       serviceClient = hodXRClient(to_http_url(
                                   self._cfg['svcrgy-addr']))
       if ringXRAddress == None:
-        self.log.info("Did not get ringmaster XML-RPC address. Fetching information from service registry.")
+        self.log.info("Did not get ringmain XML-RPC address. Fetching information from service registry.")
         ringList = serviceClient.getServiceInfo(self._cfg['userid'], 
-            self._cfg['service-id'], 'ringmaster', 'hod')
+            self._cfg['service-id'], 'ringmain', 'hod')
       
         self.log.debug(pprint.pformat(ringList))
       
@@ -777,7 +777,7 @@ class HodRing(hodBaseService):
         count = 0
         while (ringXRAddress == None and count < 3000):
           ringList = serviceClient.getServiceInfo(self._cfg['userid'], 
-            self._cfg['service-id'], 'ringmaster', 'hod')
+            self._cfg['service-id'], 'ringmain', 'hod')
         
           if len(ringList):
             if isinstance(ringList, list):
@@ -787,9 +787,9 @@ class HodRing(hodBaseService):
           time.sleep(.2)
       
       if ringXRAddress == None:
-        raise Exception("Could not get ringmaster XML-RPC server address.")
+        raise Exception("Could not get ringmain XML-RPC server address.")
         
-      self.log.debug("Creating ringmaster XML-RPC client.")
+      self.log.debug("Creating ringmain XML-RPC client.")
       ringClient = hodXRClient(ringXRAddress)    
       
       id = self.hostname + "_" + str(os.getpid())
@@ -830,16 +830,16 @@ class HodRing(hodBaseService):
 
       self.__run_hadoop_commands(False)
         
-      masterParams = []
+      mainParams = []
       for k, cmd in self.__running.iteritems():
-        masterParams.extend(cmd.filledInKeyVals)
+        mainParams.extend(cmd.filledInKeyVals)
   
       self.log.debug("printing getparams")
       self.log.debug(pformat(id))
-      self.log.debug(pformat(masterParams))
-      # when this is on a required host, the ringMaster already has our masterParams
-      if(len(masterParams) > 0):
-        ringClient.addMasterParams(id, masterParams)
+      self.log.debug(pformat(mainParams))
+      # when this is on a required host, the ringMain already has our mainParams
+      if(len(mainParams) > 0):
+        ringClient.addMainParams(id, mainParams)
     except Exception, e:
       raise Exception(e)
 
@@ -854,21 +854,21 @@ class HodRing(hodBaseService):
       serviceClient = hodXRClient(to_http_url(self._cfg['svcrgy-addr']),
                                   None, None, 0, 0, 0)
 
-      self.log.info("Fetching ringmaster information from service registry.")
+      self.log.info("Fetching ringmain information from service registry.")
       count = 0
       ringXRAddress = None
       while (ringXRAddress == None and count < 3000):
         ringList = serviceClient.getServiceInfo(self._cfg['userid'],
-          self._cfg['service-id'], 'ringmaster', 'hod')
+          self._cfg['service-id'], 'ringmain', 'hod')
         if len(ringList):
           if isinstance(ringList, list):
             ringXRAddress = ringList[0]['xrs']
         count = count + 1
 
       if ringXRAddress == None:
-        raise Exception("Could not get ringmaster XML-RPC server address.")
+        raise Exception("Could not get ringmain XML-RPC server address.")
 
-      self.log.debug("Creating ringmaster XML-RPC client.")
+      self.log.debug("Creating ringmain XML-RPC client.")
       ringClient = hodXRClient(ringXRAddress, None, None, 0, 0, 0)
 
       id = self.hostname + "_" + str(os.getpid())
@@ -895,17 +895,17 @@ class HodRing(hodBaseService):
       if initialize:
         self.log.info("Running hadoop commands again... - Initialize")
         self.__run_hadoop_commands()
-        masterParams = []
+        mainParams = []
         for k, cmd in self.__running.iteritems():
           self.log.debug(cmd)
-          masterParams.extend(cmd.filledInKeyVals)
+          mainParams.extend(cmd.filledInKeyVals)
 
         self.log.debug("printing getparams")
         self.log.debug(pformat(id))
-        self.log.debug(pformat(masterParams))
-        # when this is on a required host, the ringMaster already has our masterParams
-        if(len(masterParams) > 0):
-          ringClient.addMasterParams(id, masterParams)
+        self.log.debug(pformat(mainParams))
+        # when this is on a required host, the ringMain already has our mainParams
+        if(len(mainParams) > 0):
+          ringClient.addMainParams(id, mainParams)
       else:
         self.log.info("Running hadoop commands again... - No Initialize")
         self.__run_hadoop_commands()

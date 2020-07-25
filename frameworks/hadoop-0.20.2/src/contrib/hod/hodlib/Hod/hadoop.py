@@ -139,7 +139,7 @@ class hadoopCluster:
     self.jobId = None
     self.mapredInfo = None
     self.hdfsInfo = None
-    self.ringmasterXRS = None
+    self.ringmainXRS = None
 
   def __get_svcrgy_client(self):
     svcrgyUrl = to_http_url(self.__cfg['hod']['xrs-address'])
@@ -226,16 +226,16 @@ class hadoopCluster:
   def __isJobFeasible(self):
     return self.__nodePool.isJobFeasible()
   
-  def __get_ringmaster_client(self):
-    ringmasterXRS = None
+  def __get_ringmain_client(self):
+    ringmainXRS = None
    
     ringList = self.__svcrgyClient.getServiceInfo(
-      self.__cfg['ringmaster']['userid'], self.__nodePool.getServiceId(), 
-      'ringmaster', 'hod')
+      self.__cfg['ringmain']['userid'], self.__nodePool.getServiceId(), 
+      'ringmain', 'hod')
 
     if ringList and len(ringList):
       if isinstance(ringList, list):
-        ringmasterXRS = ringList[0]['xrs']
+        ringmainXRS = ringList[0]['xrs']
     else:    
       count = 0
       waitTime = self.__cfg['hod']['allocate-wait-time']
@@ -245,15 +245,15 @@ class hadoopCluster:
           raise HodInterruptException()
 
         ringList = self.__svcrgyClient.getServiceInfo(
-          self.__cfg['ringmaster']['userid'], self.__nodePool.getServiceId(), 
-          'ringmaster', 
+          self.__cfg['ringmain']['userid'], self.__nodePool.getServiceId(), 
+          'ringmain', 
           'hod')
         
         if ringList and len(ringList):
           if isinstance(ringList, list):        
-            ringmasterXRS = ringList[0]['xrs']
+            ringmainXRS = ringList[0]['xrs']
         
-        if ringmasterXRS is not None:
+        if ringmainXRS is not None:
           break
         else:
           time.sleep(1)
@@ -262,7 +262,7 @@ class hadoopCluster:
           if (count % self.__cfg['hod']['job-status-query-interval'] == 0):
             if not self.__check_job_status():
               break
-    return ringmasterXRS
+    return ringmainXRS
  
   def __init_hadoop_service(self, serviceName, xmlrpcClient):
     status = True
@@ -288,7 +288,7 @@ class hadoopCluster:
       except HodInterruptException,h :
         raise h
       except:
-        self.__log.critical("'%s': ringmaster xmlrpc error." % serviceName)
+        self.__log.critical("'%s': ringmain xmlrpc error." % serviceName)
         self.__log.debug(get_exception_string())
         status = False
         break
@@ -540,12 +540,12 @@ class hadoopCluster:
           self.__log.info("Cluster Id %s" \
                                                               % self.jobId)
           try:
-            self.ringmasterXRS = self.__get_ringmaster_client()
+            self.ringmainXRS = self.__get_ringmain_client()
             
-            self.__log.debug("Ringmaster at : %s" % self.ringmasterXRS )
+            self.__log.debug("Ringmain at : %s" % self.ringmainXRS )
             ringClient = None
-            if self.ringmasterXRS:
-              ringClient =  hodXRClient(self.ringmasterXRS)
+            if self.ringmainXRS:
+              ringClient =  hodXRClient(self.ringmainXRS)
                 
               hdfsStatus, hdfsAddr, self.hdfsInfo = \
                 self.__init_hadoop_service('hdfs', ringClient)
@@ -564,8 +564,8 @@ class hadoopCluster:
                     workerInfoMap = {}
                     workerInfoMap['HDFS UI'] = 'http://%s' % self.hdfsInfo
                     workerInfoMap['Mapred UI'] = 'http://%s' % self.mapredInfo
-                    # Ringmaster URL sample format : http://hostname:port/
-                    workerInfoMap['RM RPC Port'] = '%s' % self.ringmasterXRS.split(":")[2].strip("/")
+                    # Ringmain URL sample format : http://hostname:port/
+                    workerInfoMap['RM RPC Port'] = '%s' % self.ringmainXRS.split(":")[2].strip("/")
                     if mapredAddr.find(':') != -1:
                       workerInfoMap['Mapred RPC Port'] = mapredAddr.split(':')[1]
                     ret = self.__nodePool.updateWorkerInfo(workerInfoMap, self.jobId)
@@ -637,19 +637,19 @@ class hadoopCluster:
                 self.__log.debug("Returning from rm.stop()")
           except HodInterruptException, h:
             self.__log.info(HOD_INTERRUPTED_MESG)
-            if self.ringmasterXRS:
+            if self.ringmainXRS:
               if ringClient is None:
-                ringClient =  hodXRClient(self.ringmasterXRS)
+                ringClient =  hodXRClient(self.ringmainXRS)
               self.__log.debug("Calling rm.stop()")
               ringClient.stopRM()
               self.__log.debug("Returning from rm.stop()")
-              self.__log.info("Cluster Shutdown by informing ringmaster.")
+              self.__log.info("Cluster Shutdown by informing ringmain.")
             else:
               self.delete_job(self.jobId)
               self.__log.info("Cluster %s removed from queue directly." % self.jobId)
             raise h
         else:
-          self.__log.critical("No cluster found, ringmaster failed to run.")
+          self.__log.critical("No cluster found, ringmain failed to run.")
           status = 5 
 
       elif self.jobId == False:
@@ -663,16 +663,16 @@ class hadoopCluster:
         status = 4
     
     if status == 5 or status == 6:
-      ringMasterErrors = self.__svcrgyClient.getRMError()
-      if ringMasterErrors:
+      ringMainErrors = self.__svcrgyClient.getRMError()
+      if ringMainErrors:
         self.__log.critical("Cluster could not be allocated because" \
                             " of the following errors on the "\
-                            "ringmaster host %s.\n%s" % \
-                               (ringMasterErrors[0], ringMasterErrors[1]))
-        self.__log.debug("Stack trace on ringmaster: %s" % ringMasterErrors[2])
+                            "ringmain host %s.\n%s" % \
+                               (ringMainErrors[0], ringMainErrors[1]))
+        self.__log.debug("Stack trace on ringmain: %s" % ringMainErrors[2])
     return status
 
-  def __isRingMasterAlive(self, rmAddr):
+  def __isRingMainAlive(self, rmAddr):
     ret = True
     rmSocket = tcpSocket(rmAddr)
     try:
@@ -712,8 +712,8 @@ class hadoopCluster:
       if rmAddr.endswith('/'):
         rmAddr = rmAddr[:-1]
 
-    if (rmAddr is None) or (not self.__isRingMasterAlive(rmAddr)):
-      # Cluster is already dead, don't try to contact ringmaster.
+    if (rmAddr is None) or (not self.__isRingMainAlive(rmAddr)):
+      # Cluster is already dead, don't try to contact ringmain.
       self.__nodePool.finalize()
       status = 10 # As cluster is dead, we just set the status to 'cluster dead'.
     else:

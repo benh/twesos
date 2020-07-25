@@ -33,11 +33,11 @@ class MyScheduler(mesos.Scheduler):
   def getFrameworkName(self, driver):
     return "Python Deploy Jar"
 
-  def resourceOffer(self, driver, oid, slave_offers):
+  def resourceOffer(self, driver, oid, subordinate_offers):
     print "Got resource offer %s" % oid
     self.lock.acquire()
     tasks = []
-    for offer in slave_offers:
+    for offer in subordinate_offers:
       if int(self.task_count) > int(self.num_tasks): 
         print "Rejecting slot because we've launched enough tasks"
       elif int(offer.params['mem']) < 1024 or int(offer.params['cpus']) < 1:
@@ -50,7 +50,7 @@ class MyScheduler(mesos.Scheduler):
         task_args = self.jar_url + "\t" + self.jar_class + "\t" + self.jar_args
         print "task args are: " + task_args
         td = mesos.TaskDescription(
-            self.task_count, offer.slaveId, "task %d" % self.task_count, params, task_args)
+            self.task_count, offer.subordinateId, "task %d" % self.task_count, params, task_args)
         tasks.append(td)
         print "incrementing self.task_count from " + str(self.task_count)
         print "self.num_tasks is " + str(self.num_tasks)
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
   sched = MyScheduler(args[1], args[2], args[3], " ".join(args[4:len(args)]))
 
-  print "Connecting to mesos master %s" % args[0]
+  print "Connecting to mesos main %s" % args[0]
 
   mesos.MesosSchedulerDriver(sched, sys.argv[1]).run()
 

@@ -28,7 +28,7 @@ libdir = os.path.dirname(binfile)
 sys.path.append(libdir)
 
 import hodlib.Common.logger
-from hodlib.RingMaster.idleJobTracker import JobTrackerMonitor, HadoopJobStatus
+from hodlib.RingMain.idleJobTracker import JobTrackerMonitor, HadoopJobStatus
 
 from hodlib.Common.threads import func 
 
@@ -45,53 +45,53 @@ from hodlib.Common.xmlrpc import hodXRClient
 from hodlib.Common.miniHTMLParser import miniHTMLParser
 from hodlib.Common.threads import simpleCommand
 
-class ringMasterServer:
-  """The RPC server that exposes all the master config
+class ringMainServer:
+  """The RPC server that exposes all the main config
   changes. Also, one of these RPC servers runs as a proxy
   and all the hodring instances register with this proxy"""
   instance = None
   xmlrpc = None
   
-  def __init__(self, cfg, log, logMasterSources, retry=5):
+  def __init__(self, cfg, log, logMainSources, retry=5):
     try:
       from hodlib.Common.socketServers import twistedXMLRPCServer
-      ringMasterServer.xmlrpc = twistedXMLRPCServer("", 
-        cfg['ringmaster']['xrs-port-range'])
+      ringMainServer.xmlrpc = twistedXMLRPCServer("", 
+        cfg['ringmain']['xrs-port-range'])
     except ImportError:
       log.info("Twisted interface not found. Using hodXMLRPCServer.")
-      ringMasterServer.xmlrpc = hodXMLRPCServer("", 
-        cfg['ringmaster']['xrs-port-range'])
+      ringMainServer.xmlrpc = hodXMLRPCServer("", 
+        cfg['ringmain']['xrs-port-range'])
 
-    ringMasterServer.xmlrpc.register_instance(logMasterSources)
-    self.logMasterSources = logMasterSources
-    ringMasterServer.xmlrpc.serve_forever()
+    ringMainServer.xmlrpc.register_instance(logMainSources)
+    self.logMainSources = logMainSources
+    ringMainServer.xmlrpc.serve_forever()
         
-    while not ringMasterServer.xmlrpc.is_alive():
+    while not ringMainServer.xmlrpc.is_alive():
       time.sleep(.5)
           
-    log.debug('Ringmaster RPC Server at %d' % 
-                 ringMasterServer.xmlrpc.server_address[1])
+    log.debug('Ringmain RPC Server at %d' % 
+                 ringMainServer.xmlrpc.server_address[1])
     
   def startService(ss, cfg, np, log, rm):
-    logMasterSources = _LogMasterSources(ss, cfg, np, log, rm)
-    ringMasterServer.instance = ringMasterServer(cfg, log, logMasterSources)
+    logMainSources = _LogMainSources(ss, cfg, np, log, rm)
+    ringMainServer.instance = ringMainServer(cfg, log, logMainSources)
 
   def stopService():
-    ringMasterServer.xmlrpc.stop()
+    ringMainServer.xmlrpc.stop()
   
   def getPort():
-    return ringMasterServer.instance.port
+    return ringMainServer.instance.port
 
   def getAddress():
     return 'http://%s:%d/' % (socket.gethostname(), 
-                              ringMasterServer.xmlrpc.server_address[1])
+                              ringMainServer.xmlrpc.server_address[1])
   
   startService = staticmethod(startService)
   stopService = staticmethod(stopService)
   getPort = staticmethod(getPort)
   getAddress = staticmethod(getAddress)
   
-class _LogMasterSources:
+class _LogMainSources:
   """All the methods that are run by the RPC server are
   added into this class """
   
@@ -103,8 +103,8 @@ class _LogMasterSources:
     self.count = {}
     self.logsourceList = []
     self.logsourceListLock = threading.Lock()
-    self.masterParam = []
-    self.masterParamLock = threading.Lock()
+    self.mainParam = []
+    self.mainParamLock = threading.Lock()
     self.verify = 'none'
     self.cmdLock = threading.Lock()
     self.cfg = cfg
@@ -113,7 +113,7 @@ class _LogMasterSources:
     self.rm = rm 
     self.hdfsHost = None
     self.mapredHost = None
-    self.maxconnect = self.cfg['ringmaster']['max-connect']
+    self.maxconnect = self.cfg['ringmain']['max-connect']
     self.log.debug("Using max-connect value %s"%self.maxconnect)
 
    
@@ -123,7 +123,7 @@ class _LogMasterSources:
     lock.acquire()
     self.dict[url] = url
     self.count[url] = 0
-    # addr is None when ringMaster himself invokes this method
+    # addr is None when ringMain himself invokes this method
     if addr:
       c = self.count[addr]
       self.count[addr] = c - 1
@@ -186,16 +186,16 @@ class _LogMasterSources:
 #            self.cfg[i1][i2] = val
 #            self.log.debug("\nModified [%s][%s]=%s to [%s][%s]=%s" % (i1, i2, prev, i1, i2, val))
 #          except KeyError, e:
-#            self.log.info("Skipping %s as no such config parameter found in ringmaster" % param)
+#            self.log.info("Skipping %s as no such config parameter found in ringmain" % param)
 #        self.log.debug("Regenerating Service Description.")
 #        dGen = DescGenerator(self.rm.cfg)
 #        self.rm.cfg['servicedesc'] = dGen.createServiceDescDict()
 #        self.cfg['servicedesc'] = self.rm.cfg['servicedesc']
 #  
 #      self.rm.tar = None
-#      if self.rm.cfg['ringmaster'].has_key('hadoop-tar-ball'):
+#      if self.rm.cfg['ringmain'].has_key('hadoop-tar-ball'):
 #        self.rm.download = True
-#        self.rm.tar = self.rm.cfg['ringmaster']['hadoop-tar-ball']
+#        self.rm.tar = self.rm.cfg['ringmain']['hadoop-tar-ball']
 #        self.log.debug("self.rm.tar=%s" % self.rm.tar)
 # 
 #      self.rm.cd_to_tempdir()
@@ -239,11 +239,11 @@ class _LogMasterSources:
 #      ringList = self.rm.serviceClient.getServiceInfo(self.cfg['hodring']['userid'],
 #        self.np.getServiceId(), 'hodring', 'hod') 
 #    
-#      slaveList = ringList
+#      subordinateList = ringList
 #      hdfsringXRAddress = None
-#      # Start HDFS Master - Step 1
+#      # Start HDFS Main - Step 1
 #      if not hdfsDesc.isExternal():
-#        masterFound = False
+#        mainFound = False
 #        for ring in ringList:
 #          ringXRAddress = ring['xrs']
 #          if ringXRAddress == None:
@@ -251,63 +251,63 @@ class _LogMasterSources:
 #          if  (ringXRAddress.find(self.hdfsHost) != -1):
 #            ringClient = hodXRClient(ringXRAddress, None, None, 0, 0, 0, False, 0)
 #            hdfsringXRAddress = ringXRAddress
-#            self.log.debug("Invoking clusterStart on " + ringXRAddress + " (HDFS Master)")
+#            self.log.debug("Invoking clusterStart on " + ringXRAddress + " (HDFS Main)")
 #            ringClient.clusterStart()
-#            masterFound = True 
-#            slaveList.remove(ring)
+#            mainFound = True 
+#            subordinateList.remove(ring)
 #            break
-#        if not masterFound:
-#          raise Exception("HDFS Master host not found")
+#        if not mainFound:
+#          raise Exception("HDFS Main host not found")
 #        while hdfs.getInfoAddrs() == None:
-#          self.log.debug("Waiting for HDFS Master (Name Node) to register dfs.info.port")
+#          self.log.debug("Waiting for HDFS Main (Name Node) to register dfs.info.port")
 #          time.sleep(1)
 #
-#      # Start MAPRED Master - Step 2
+#      # Start MAPRED Main - Step 2
 #      if not mrDesc.isExternal():
-#        masterFound = False
+#        mainFound = False
 #        for ring in ringList:
 #          ringXRAddress = ring['xrs']
 #          if ringXRAddress == None:
 #            raise Exception("Could not get hodring XML-RPC server address.")
 #          if (not mrDesc.isExternal() and ringXRAddress.find(self.mapredHost) != -1):
 #            ringClient = hodXRClient(ringXRAddress, None, None, 0, 0, 0, False, 0)
-#            self.log.debug("Invoking clusterStart on " + ringXRAddress + " (MAPRED Master)")
+#            self.log.debug("Invoking clusterStart on " + ringXRAddress + " (MAPRED Main)")
 #            ringClient.clusterStart()
-#            masterFound = True 
-#            slaveList.remove(ring)
+#            mainFound = True 
+#            subordinateList.remove(ring)
 #            break
-#        if not masterFound:
-#          raise Excpetion("MAPRED Master host not found")
+#        if not mainFound:
+#          raise Excpetion("MAPRED Main host not found")
 #        while mr.getInfoAddrs() == None:
-#          self.log.debug("Waiting for MAPRED Master (Job Tracker) to register \
+#          self.log.debug("Waiting for MAPRED Main (Job Tracker) to register \
 # mapred.job.tracker.info.port")
 #          time.sleep(1)
 #
-#      # Start Slaves - Step 3 
-#      for ring in slaveList:
+#      # Start Subordinates - Step 3 
+#      for ring in subordinateList:
 #          ringXRAddress = ring['xrs']
 #          if ringXRAddress == None:
 #            raise Exception("Could not get hodring XML-RPC server address.")
 #          ringClient = hodXRClient(ringXRAddress, None, None, 0, 0, 0, False, 0)
-#          self.log.debug("Invoking clusterStart on " + ringXRAddress + " (Slaves)")
-#          ringThread = func(name='hodring_slaves_start', functionRef=ringClient.clusterStart())
+#          self.log.debug("Invoking clusterStart on " + ringXRAddress + " (Subordinates)")
+#          ringThread = func(name='hodring_subordinates_start', functionRef=ringClient.clusterStart())
 #          ring['thread'] = ringThread
 #          ringThread.start()
 #
-#      for ring in slaveList:
+#      for ring in subordinateList:
 #        ringThread = ring['thread']
 #        if ringThread == None:
-#          raise Exception("Could not get hodring thread (Slave).")
+#          raise Exception("Could not get hodring thread (Subordinate).")
 #        ringThread.join()
-#        self.log.debug("Completed clusterStart on " + ring['xrs'] + " (Slave)")
+#        self.log.debug("Completed clusterStart on " + ring['xrs'] + " (Subordinate)")
 #
-#      # Run Admin Commands on HDFS Master - Step 4
+#      # Run Admin Commands on HDFS Main - Step 4
 #      if not hdfsDesc.isExternal():
 #        if hdfsringXRAddress == None:
-#          raise Exception("HDFS Master host not found (to Run Admin Commands)")
+#          raise Exception("HDFS Main host not found (to Run Admin Commands)")
 #        ringClient = hodXRClient(hdfsringXRAddress, None, None, 0, 0, 0, False, 0)
 #        self.log.debug("Invoking clusterStart(False) - Admin on "
-#                       + hdfsringXRAddress + " (HDFS Master)")
+#                       + hdfsringXRAddress + " (HDFS Main)")
 #        ringClient.clusterStart(False)
 #
 #    except:
@@ -361,7 +361,7 @@ class _LogMasterSources:
   def getCommand(self, addr):
     """This method is called by the
     hodrings to get commands from
-    the ringmaster"""
+    the ringmain"""
     lock = self.cmdLock
     cmdList = []
     lock.acquire()
@@ -370,20 +370,20 @@ class _LogMasterSources:
         for v in self.serviceDict.itervalues():
           if (not v.isExternal()):
             if v.isLaunchable(self.serviceDict):
-              # If a master is still not launched, or the number of 
-              # retries for launching master is not reached, 
-              # launch master
-              if not v.isMasterLaunched() and \
-                  (v.getMasterFailureCount() <= \
-                      self.cfg['ringmaster']['max-master-failures']):
-                cmdList = v.getMasterCommands(self.serviceDict)
-                v.setlaunchedMaster()
-                v.setMasterAddress(addr)
+              # If a main is still not launched, or the number of 
+              # retries for launching main is not reached, 
+              # launch main
+              if not v.isMainLaunched() and \
+                  (v.getMainFailureCount() <= \
+                      self.cfg['ringmain']['max-main-failures']):
+                cmdList = v.getMainCommands(self.serviceDict)
+                v.setlaunchedMain()
+                v.setMainAddress(addr)
                 break
         if cmdList == []:
           for s in self.serviceDict.itervalues():
             if (not v.isExternal()):
-              if s.isMasterInitialized():
+              if s.isMainInitialized():
                 cl = s.getWorkerCommands(self.serviceDict)
                 cmdList.extend(cl)
               else:
@@ -402,7 +402,7 @@ class _LogMasterSources:
   def getAdminCommand(self, addr):
     """This method is called by the
     hodrings to get admin commands from
-    the ringmaster"""
+    the ringmain"""
     lock = self.cmdLock
     cmdList = []
     lock.acquire()
@@ -421,21 +421,21 @@ class _LogMasterSources:
     self.log.debug("getAdminCommand returning " + cmd)
     return cmdList
 
-  def addMasterParams(self, addr, vals):
+  def addMainParams(self, addr, vals):
     """This method is called by
     hodring to update any parameters
     its changed for the commands it was
     running"""
-    self.log.debug('Comment: adding master params from %s' % addr)
+    self.log.debug('Comment: adding main params from %s' % addr)
     self.log.debug(pformat(vals))
-    lock = self.masterParamLock
+    lock = self.mainParamLock
     lock.acquire()
     try:
       for v in self.serviceDict.itervalues():
-        if v.isMasterLaunched():
-          if (v.getMasterAddress() == addr):
-            v.setMasterParams(vals)
-            v.setMasterInitialized()
+        if v.isMainLaunched():
+          if (v.getMainAddress() == addr):
+            v.setMainParams(vals)
+            v.setMainInitialized()
     except:
       self.log.debug(get_exception_string())
       pass
@@ -448,17 +448,17 @@ class _LogMasterSources:
       it encountered while starting up"""
     self.log.critical("Hodring at %s failed with following errors:\n%s" \
                         % (addr, errors))
-    lock = self.masterParamLock
+    lock = self.mainParamLock
     lock.acquire()
     try:
       for v in self.serviceDict.itervalues():
-        if v.isMasterLaunched():
-          if (v.getMasterAddress() == addr):
+        if v.isMainLaunched():
+          if (v.getMainAddress() == addr):
             # strip the PID part.
             idx = addr.rfind('_')
             if idx is not -1:
               addr = addr[:idx]
-            v.setMasterFailed("Hodring at %s failed with following" \
+            v.setMainFailed("Hodring at %s failed with following" \
                                 " errors:\n%s" % (addr, errors))
     except:
       self.log.debug(get_exception_string())
@@ -467,7 +467,7 @@ class _LogMasterSources:
     return True
 
   def getKeys(self):
-    lock= self.masterParamLock
+    lock= self.mainParamLock
     lock.acquire()
     keys = self.serviceDict.keys()
     lock.release()    
@@ -477,7 +477,7 @@ class _LogMasterSources:
   def getServiceAddr(self, name):
     addr = 'not found'
     self.log.debug("getServiceAddr name: %s" % name)
-    lock= self.masterParamLock
+    lock= self.mainParamLock
     lock.acquire()
     try:
       service = self.serviceDict[name]
@@ -487,17 +487,17 @@ class _LogMasterSources:
       self.log.debug("getServiceAddr service: %s" % service)
       # Check if we should give up ! If the limit on max failures is hit, 
       # give up.
-      err = service.getMasterFailed()
+      err = service.getMainFailed()
       if (err is not None) and \
-            (service.getMasterFailureCount() > \
-                      self.cfg['ringmaster']['max-master-failures']):
+            (service.getMainFailureCount() > \
+                      self.cfg['ringmain']['max-main-failures']):
         self.log.critical("Detected errors (%s) beyond allowed number"\
                             " of failures (%s). Flagging error to client" \
-                            % (service.getMasterFailureCount(), \
-                              self.cfg['ringmaster']['max-master-failures']))
+                            % (service.getMainFailureCount(), \
+                              self.cfg['ringmain']['max-main-failures']))
         addr = "Error: " + err
-      elif (service.isMasterInitialized()):
-        addr = service.getMasterAddrs()[0]
+      elif (service.isMainInitialized()):
+        addr = service.getMainAddrs()[0]
       else:
         addr = 'not found'
     lock.release()
@@ -507,7 +507,7 @@ class _LogMasterSources:
 
   def getURLs(self, name):
     addr = 'none'
-    lock = self.masterParamLock
+    lock = self.mainParamLock
     lock.acquire()
     
     try:
@@ -515,7 +515,7 @@ class _LogMasterSources:
     except KeyError:
       pass
     else:
-      if (service.isMasterInitialized()):
+      if (service.isMainInitialized()):
         addr = service.getInfoAddrs()[0]
       
     lock.release()
@@ -523,20 +523,20 @@ class _LogMasterSources:
     return addr
 
   def stopRM(self):
-    """An XMLRPC call which will spawn a thread to stop the Ringmaster program."""
+    """An XMLRPC call which will spawn a thread to stop the Ringmain program."""
     # We spawn a thread here because we want the XMLRPC call to return. Calling
     # stop directly from here will also stop the XMLRPC server.
     try:
-      self.log.debug("inside xml-rpc call to stop ringmaster")
+      self.log.debug("inside xml-rpc call to stop ringmain")
       rmStopperThread = func('RMStopper', self.rm.stop)
       rmStopperThread.start()
-      self.log.debug("returning from xml-rpc call to stop ringmaster")
+      self.log.debug("returning from xml-rpc call to stop ringmain")
       return True
     except:
       self.log.debug("Exception in stop: %s" % get_exception_string())
       return False
 
-class RingMaster:
+class RingMain:
   def __init__(self, cfg, log, **kwds):
     """starts nodepool and services"""
     self.download = False
@@ -551,9 +551,9 @@ class RingMaster:
     self.__idlenessDetected = False
     self.__stopInProgress = False
     self.__isStopped = False # to let main exit
-    self.__exitCode = 0 # exit code with which the ringmaster main method should return
+    self.__exitCode = 0 # exit code with which the ringmain main method should return
 
-    self.workers_per_ring = self.cfg['ringmaster']['workers_per_ring']
+    self.workers_per_ring = self.cfg['ringmain']['workers_per_ring']
 
     self.__initialize_signal_handlers()
     
@@ -573,9 +573,9 @@ class RingMaster:
     self.log.debug("Got service ID: %s" % self.serviceId)
 
     self.tarSrcLoc = None
-    if self.cfg['ringmaster'].has_key('hadoop-tar-ball'):
+    if self.cfg['ringmain'].has_key('hadoop-tar-ball'):
       self.download = True
-      self.tarSrcLoc = self.cfg['ringmaster']['hadoop-tar-ball']
+      self.tarSrcLoc = self.cfg['ringmain']['hadoop-tar-ball']
  
     self.cd_to_tempdir()
 
@@ -586,7 +586,7 @@ class RingMaster:
         raise Exception('Did not find tarball copied from %s in %s.'
                           % (self.tarSrcLoc, os.getcwd()))
       
-    self.serviceAddr = to_http_url(self.cfg['ringmaster']['svcrgy-addr'])
+    self.serviceAddr = to_http_url(self.cfg['ringmain']['svcrgy-addr'])
     
     self.log.debug("Service registry @ %s" % self.serviceAddr)
     
@@ -609,7 +609,7 @@ class RingMaster:
                         + ' Check the Hadoop installation or the value of the hodring.java-home variable.')
       if hdfsDesc.isExternal():
         hdfs = HdfsExternal(hdfsDesc, workDirs, version=int(hadoopVers['minor']))
-        hdfs.setMasterParams( self.cfg['gridservice-hdfs'] )
+        hdfs.setMainParams( self.cfg['gridservice-hdfs'] )
       else:
         hdfs = Hdfs(hdfsDesc, workDirs, 0, version=int(hadoopVers['minor']),
                     workers_per_ring = self.workers_per_ring)
@@ -620,7 +620,7 @@ class RingMaster:
       mr = None
       if mrDesc.isExternal():
         mr = MapReduceExternal(mrDesc, workDirs, version=int(hadoopVers['minor']))
-        mr.setMasterParams( self.cfg['gridservice-mapred'] )
+        mr.setMainParams( self.cfg['gridservice-mapred'] )
       else:
         mr = MapReduce(mrDesc, workDirs,1, version=int(hadoopVers['minor']),
                        workers_per_ring = self.workers_per_ring)
@@ -633,67 +633,67 @@ class RingMaster:
       raise
 
     # should not be starting these in a constructor
-    ringMasterServer.startService(self.serviceDict, cfg, self.np, log, self)
+    ringMainServer.startService(self.serviceDict, cfg, self.np, log, self)
     
-    self.rpcserver = ringMasterServer.getAddress()
+    self.rpcserver = ringMainServer.getAddress()
     
     self.httpAddress = None   
     self.tarAddress = None 
     hostname = socket.gethostname()
     if (self.download):
       self.httpServer = threadedHTTPServer(hostname, 
-        self.cfg['ringmaster']['http-port-range'])
+        self.cfg['ringmain']['http-port-range'])
       
       self.httpServer.serve_forever()
       self.httpAddress = "http://%s:%d/" % (self.httpServer.server_address[0], 
                                  self.httpServer.server_address[1])
       self.tarAddress = "%s%s" % (self.httpAddress, self.basename)
       
-      ringMasterServer.instance.logMasterSources.registerTarSource(hostname, 
+      ringMainServer.instance.logMainSources.registerTarSource(hostname, 
                                                                    self.tarAddress)
     else:
       self.log.debug("Download not set.")
     
-    self.log.debug("%s %s %s %s %s" % (self.cfg['ringmaster']['userid'], 
-      self.serviceId, self.__hostname, 'ringmaster', 'hod'))
+    self.log.debug("%s %s %s %s %s" % (self.cfg['ringmain']['userid'], 
+      self.serviceId, self.__hostname, 'ringmain', 'hod'))
     
-    if self.cfg['ringmaster']['register']:      
+    if self.cfg['ringmain']['register']:      
       if self.httpAddress:
-        self.serviceClient.registerService(self.cfg['ringmaster']['userid'], 
-          self.serviceId, self.__hostname, 'ringmaster', 'hod', {
+        self.serviceClient.registerService(self.cfg['ringmain']['userid'], 
+          self.serviceId, self.__hostname, 'ringmain', 'hod', {
           'xrs' : self.rpcserver, 'http' : self.httpAddress })
       else:
-        self.serviceClient.registerService(self.cfg['ringmaster']['userid'], 
-          self.serviceId, self.__hostname, 'ringmaster', 'hod', {
+        self.serviceClient.registerService(self.cfg['ringmain']['userid'], 
+          self.serviceId, self.__hostname, 'ringmain', 'hod', {
           'xrs' : self.rpcserver, })
     
     self.log.debug("Registered with serivce registry: %s." % self.serviceAddr)
     
-    hodRingPath = os.path.join(cfg['ringmaster']['base-dir'], 'bin', 'hodring')
+    hodRingPath = os.path.join(cfg['ringmain']['base-dir'], 'bin', 'hodring')
     hodRingWorkDir = os.path.join(cfg['hodring']['temp-dir'], 'hodring' + '_' 
                                   + getpass.getuser())
     
     self.cfg['hodring']['hodring'] = [hodRingWorkDir,]
-    self.cfg['hodring']['svcrgy-addr'] = self.cfg['ringmaster']['svcrgy-addr']
+    self.cfg['hodring']['svcrgy-addr'] = self.cfg['ringmain']['svcrgy-addr']
     self.cfg['hodring']['service-id'] = self.np.getServiceId()
 
-    self.cfg['hodring']['ringmaster-xrs-addr'] = self.__url_to_addr(self.rpcserver)
+    self.cfg['hodring']['ringmain-xrs-addr'] = self.__url_to_addr(self.rpcserver)
     
     if (self.tarSrcLoc != None):
       cfg['hodring']['download-addr'] = self.tarAddress
  
-    self.__init_job_tracker_monitor(ringMasterServer.instance.logMasterSources)
+    self.__init_job_tracker_monitor(ringMainServer.instance.logMainSources)
 
-  def __init_job_tracker_monitor(self, logMasterSources):
+  def __init_job_tracker_monitor(self, logMainSources):
     hadoopDir = self.__getHadoopDir()
     self.log.debug('hadoopdir=%s, java-home=%s' % \
                 (hadoopDir, self.cfg['hodring']['java-home']))
     try:
       self.__jtMonitor = JobTrackerMonitor(self.log, self, 
-                            self.cfg['ringmaster']['jt-poll-interval'], 
-                            self.cfg['ringmaster']['idleness-limit'],
+                            self.cfg['ringmain']['jt-poll-interval'], 
+                            self.cfg['ringmain']['idleness-limit'],
                             hadoopDir, self.cfg['hodring']['java-home'],
-                            logMasterSources)
+                            logMainSources)
       self.log.debug('starting jt monitor')
       self.__jtMonitor.start()
     except:
@@ -704,7 +704,7 @@ class RingMaster:
 
   def __getHadoopDir(self):
     hadoopDir = None
-    if self.cfg['ringmaster'].has_key('hadoop-tar-ball'):
+    if self.cfg['ringmain'].has_key('hadoop-tar-ball'):
       tarFile = os.path.join(os.getcwd(), self.basename)
       ret = untar(tarFile, os.getcwd())
       if not ret:
@@ -793,8 +793,8 @@ class RingMaster:
     self.log.debug("Cleaned up temporary dir: %s" % tempDir)
 
   def __get_tempdir(self):
-    dir = os.path.join(self.cfg['ringmaster']['temp-dir'], 
-                          "%s.%s.ringmaster" % (self.cfg['ringmaster']['userid'], 
+    dir = os.path.join(self.cfg['ringmain']['temp-dir'], 
+                          "%s.%s.ringmain" % (self.cfg['ringmain']['userid'], 
                                                 self.np.getServiceId()))
     return dir
 
@@ -809,7 +809,7 @@ class RingMaster:
       irand = int(frand)
       uniq = '%s-%d-%s' % (socket.gethostname(), os.getpid(), irand)
       dirs = []
-      parentDirs = cfg['ringmaster']['work-dirs']
+      parentDirs = cfg['ringmain']['work-dirs']
       for p in parentDirs:
         dir = os.path.join(p, uniq)
         dirs.append(dir)
@@ -889,7 +889,7 @@ class RingMaster:
 
   def handleIdleJobTracker(self):
     self.log.critical("Detected idle job tracker for %s seconds. The allocation will be cleaned up." \
-                          % self.cfg['ringmaster']['idleness-limit'])
+                          % self.cfg['ringmain']['idleness-limit'])
     self.__idlenessDetected = True
 
   def cd_to_tempdir(self):
@@ -911,7 +911,7 @@ class RingMaster:
     """run the thread main loop"""
     
     self.log.debug("Entered start method.")
-    hodring = os.path.join(self.cfg['ringmaster']['base-dir'], 
+    hodring = os.path.join(self.cfg['ringmain']['base-dir'], 
                            'bin', 'hodring')
     largs = [hodring]
     targs = self.cfg.get_args(section='hodring')
@@ -932,7 +932,7 @@ class RingMaster:
 
   def __findExitCode(self):
     """Determine the exit code based on the status of the cluster or jobs run on them"""
-    xmlrpcServer = ringMasterServer.instance.logMasterSources
+    xmlrpcServer = ringMainServer.instance.logMainSources
     if xmlrpcServer.getServiceAddr('hdfs') == 'not found' or \
         xmlrpcServer.getServiceAddr('hdfs').startswith("Error: "):
       self.__exitCode = 7
@@ -973,15 +973,15 @@ class RingMaster:
     return ret
 
   def stop(self):
-    self.log.debug("RingMaster stop method invoked.")
+    self.log.debug("RingMain stop method invoked.")
     if self.__stopInProgress or self.__isStopped:
       return
     self.__stopInProgress = True
-    if ringMasterServer.instance is not None:
+    if ringMainServer.instance is not None:
       self.log.debug('finding exit code')
       self.__findExitCode()
-      self.log.debug('stopping ringmaster instance')
-      ringMasterServer.stopService()
+      self.log.debug('stopping ringmain instance')
+      ringMainServer.stopService()
     else:
       self.__exitCode = 6
     if self.__jtMonitor is not None:
@@ -1006,7 +1006,7 @@ def main(cfg,log):
     rm = None
     dGen = DescGenerator(cfg)
     cfg = dGen.initializeDesc()
-    rm = RingMaster(cfg, log)
+    rm = RingMain(cfg, log)
     rm.start()
     while not rm.shouldStop():
       time.sleep(1)

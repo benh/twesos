@@ -28,7 +28,7 @@ excludes = ['test_MINITEST1', 'test_MINITEST2']
  
 from hodlib.GridServices import *
 from hodlib.Common.desc import ServiceDesc
-from hodlib.RingMaster.ringMaster import _LogMasterSources
+from hodlib.RingMain.ringMain import _LogMainSources
 
 configuration = {
        'hod': {}, 
@@ -36,9 +36,9 @@ configuration = {
                             'id': 'torque', 
                             'batch-home': '/home/y/'
                           }, 
-       'ringmaster': {
+       'ringmain': {
                       'max-connect' : 2,
-                      'max-master-failures' : 5
+                      'max-main-failures' : 5
                      }, 
        'hodring': {
                   }, 
@@ -70,15 +70,15 @@ class test_MINITEST1(unittest.TestCase):
 class test_Multiple_Workers(unittest.TestCase):
   def setUp(self):
     self.config = configuration
-    self.config['ringmaster']['workers_per_ring'] = 2
+    self.config['ringmain']['workers_per_ring'] = 2
 
     hdfsDesc = self.config['servicedesc']['hdfs'] = ServiceDesc(self.config['gridservice-hdfs'])
     mrDesc = self.config['servicedesc']['mapred'] = ServiceDesc(self.config['gridservice-mapred'])
 
     self.hdfs = Hdfs(hdfsDesc, [], 0, 19, workers_per_ring = \
-                                 self.config['ringmaster']['workers_per_ring'])
+                                 self.config['ringmain']['workers_per_ring'])
     self.mr = MapReduce(mrDesc, [],1, 19, workers_per_ring = \
-                                 self.config['ringmaster']['workers_per_ring'])
+                                 self.config['ringmain']['workers_per_ring'])
     
     self.log = logging.getLogger()
     pass
@@ -88,14 +88,14 @@ class test_Multiple_Workers(unittest.TestCase):
     self.serviceDict = {}
     self.serviceDict[self.hdfs.getName()] = self.hdfs
     self.serviceDict[self.mr.getName()] = self.mr
-    self.rpcSet = _LogMasterSources(self.serviceDict, self.config, None, self.log, None)
+    self.rpcSet = _LogMainSources(self.serviceDict, self.config, None, self.log, None)
 
     cmdList = self.rpcSet.getCommand('host1')
     self.assertEquals(len(cmdList), 2)
     self.assertEquals(cmdList[0].dict['argv'][0], 'namenode')
     self.assertEquals(cmdList[1].dict['argv'][0], 'namenode')
     addParams = ['fs.default.name=host1:51234', 'dfs.http.address=host1:5125' ]
-    self.rpcSet.addMasterParams('host1', addParams)
+    self.rpcSet.addMainParams('host1', addParams)
     # print "NN is launched"
 
     cmdList = self.rpcSet.getCommand('host2')
@@ -103,13 +103,13 @@ class test_Multiple_Workers(unittest.TestCase):
     self.assertEquals(cmdList[0].dict['argv'][0], 'jobtracker')
     addParams = ['mapred.job.tracker=host2:51236',
                  'mapred.job.tracker.http.address=host2:51237']
-    self.rpcSet.addMasterParams('host2', addParams)
+    self.rpcSet.addMainParams('host2', addParams)
     # print "JT is launched"
 
     cmdList = self.rpcSet.getCommand('host3')
     # Verify the workers count per ring : TTs + DNs
     self.assertEquals(len(cmdList),
-                      self.config['ringmaster']['workers_per_ring'] * 2)
+                      self.config['ringmain']['workers_per_ring'] * 2)
     pass
     
   def testFailure(self):
@@ -139,7 +139,7 @@ class test_GetCommand(unittest.TestCase):
     self.serviceDict = {}
     self.serviceDict[self.hdfs.getName()] = self.hdfs
     self.serviceDict[self.mr.getName()] = self.mr
-    self.rpcSet = _LogMasterSources(self.serviceDict, self.config, None, self.log, None)
+    self.rpcSet = _LogMainSources(self.serviceDict, self.config, None, self.log, None)
 
     cmdList = self.rpcSet.getCommand('localhost')
     self.assertEquals(cmdList.__len__(), 2)
@@ -150,7 +150,7 @@ class test_GetCommand(unittest.TestCase):
   def tearDown(self):
     pass
 
-class RingmasterRPCsTestSuite(BaseTestSuite):
+class RingmainRPCsTestSuite(BaseTestSuite):
   def __init__(self):
     # suite setup
     BaseTestSuite.__init__(self, __name__, excludes)
@@ -160,12 +160,12 @@ class RingmasterRPCsTestSuite(BaseTestSuite):
     # suite tearDown
     pass
 
-def RunRingmasterRPCsTests():
+def RunRingmainRPCsTests():
   # modulename_suite
-  suite = RingmasterRPCsTestSuite()
+  suite = RingmainRPCsTestSuite()
   testResult = suite.runTests()
   suite.cleanUp() 
   return testResult
 
 if __name__ == "__main__":
-  RunRingmasterRPCsTests()
+  RunRingmainRPCsTests()

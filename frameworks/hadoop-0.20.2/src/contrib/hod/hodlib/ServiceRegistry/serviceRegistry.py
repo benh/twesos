@@ -31,7 +31,7 @@ class svcrgy(hodBaseService):
         self.__locked = {}
         
         self.__serviceDictLock = threading.Lock()
-        self.RMErrorMsgs = None # Ringmaster error messages
+        self.RMErrorMsgs = None # Ringmain error messages
         self.log = log
         if self.log is None:
           self.log = logging.getLogger()
@@ -56,12 +56,12 @@ class svcrgy(hodBaseService):
         if self.RMErrorMsgs is not None:
           return self.RMErrorMsgs
         else:
-          self.log.debug("no Ringmaster error messages")
+          self.log.debug("no Ringmain error messages")
           return False
 
     def registerService(self, userid, job, host, name, type, dict):
         """Method thats called upon by
-        the ringmaster to register to the
+        the ringmain to register to the
         the service registry"""
         lock = self.__serviceDictLock
         lock.acquire()
