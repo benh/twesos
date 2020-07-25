@@ -66,19 +66,19 @@ class TorquePool(NodePool):
     
     def gen_stdin_list():
       # Here we are basically generating the standard input for qsub.
-      #  Specifically a script to exec ringmaster.
+      #  Specifically a script to exec ringmain.
       stdinList.append('#!/bin/sh')
       
       ringBin = os.path.join(self._cfg['hod']['base-dir'], 'bin', 
-                             'ringmaster')
+                             'ringmain')
       ringArgs = [ringBin,]
       ringArgs.extend(self._cfg.get_args(exclude=('hod')))
       
-      ringMasterCommand = args_to_string(ringArgs)
+      ringMainCommand = args_to_string(ringArgs)
       
-      self._log.debug("ringmaster cmd: %s" % ringMasterCommand)
+      self._log.debug("ringmain cmd: %s" % ringMainCommand)
       
-      stdinList.append(ringMasterCommand)
+      stdinList.append(ringMainCommand)
       
     def gen_arg_list():      
       def process_qsub_attributes():

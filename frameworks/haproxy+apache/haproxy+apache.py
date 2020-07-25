@@ -65,11 +65,11 @@ class ApacheWebFWScheduler(mesos.Scheduler):
     self.haproxy = Popen(cmd, shell = False)
     self.reconfigs += 1
 
-  def resourceOffer(self, driver, oid, slave_offers):
-    print "Got resource offer %s with %s slots." % (oid, len(slave_offers))
+  def resourceOffer(self, driver, oid, subordinate_offers):
+    print "Got resource offer %s with %s slots." % (oid, len(subordinate_offers))
     self.lock.acquire()
     tasks = []
-    for offer in slave_offers:
+    for offer in subordinate_offers:
       if offer.host in self.servers.values():
         print "Rejecting slot on host " + offer.host + " because we've launched a server on that machine already."
         #print "self.servers currently looks like: " + str(self.servers)
@@ -82,7 +82,7 @@ class ApacheWebFWScheduler(mesos.Scheduler):
       else:
         print "Offer is for " + offer.params['cpus'] + " CPUS and " + offer.params["mem"] + " MB on host " + offer.host
         params = {"cpus": "1", "mem": "1024"}
-        td = mesos.TaskDescription(self.id, offer.slaveId, "server %s" % self.id, params, "")
+        td = mesos.TaskDescription(self.id, offer.subordinateId, "server %s" % self.id, params, "")
         print "Accepting task, id=" + str(self.id) + ", params: " + params['cpus'] + " CPUS, and " + params['mem'] + " MB, on node " + offer.host
         tasks.append(td)
         self.servers[self.id] = offer.host
@@ -196,7 +196,7 @@ def monitor(sched):
   print "done in MONITOR()"
 
 if __name__ == "__main__":
-  parser = OptionParser(usage = "Usage: %prog mesos_master")
+  parser = OptionParser(usage = "Usage: %prog mesos_main")
 
   (options,args) = parser.parse_args()
   if len(args) < 1:
@@ -207,7 +207,7 @@ if __name__ == "__main__":
   print "sched = ApacheWebFWScheduler()"
   sched = ApacheWebFWScheduler()
 
-  print "Connecting to mesos master %s" % args[0]
+  print "Connecting to mesos main %s" % args[0]
   driver = mesos.MesosSchedulerDriver(sched, sys.argv[1])
 
   threading.Thread(target = monitor, args=[sched]).start()

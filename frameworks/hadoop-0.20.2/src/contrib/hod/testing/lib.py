@@ -40,10 +40,10 @@ class BaseTestSuite():
           test_class = getattr(mod, modItem)
           allsuites.append(unittest.makeSuite(test_class))
 
-    # Create a master suite to be run.
+    # Create a main suite to be run.
     alltests = unittest.TestSuite(tuple(allsuites))
 
-    # Run the master test suite.
+    # Run the main test suite.
     runner = self.runner.run(alltests)
     if(runner.wasSuccessful()): return 0
     printLine( "%s test(s) failed." % runner.failures.__len__())

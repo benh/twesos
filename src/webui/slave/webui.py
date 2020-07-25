@@ -5,7 +5,7 @@ import commands
 import datetime
 
 from bottle import abort, route, send_file, template
-from slave import get_slave
+from subordinate import get_subordinate
 
 start_time = datetime.datetime.now()
 
@@ -29,43 +29,43 @@ def static(filename):
 
 @route('/log/:level#[A-Z]*#')
 def log_full(level):
-  send_file('mesos-slave.' + level, root = log_dir,
+  send_file('mesos-subordinate.' + level, root = log_dir,
             guessmime = False, mimetype = 'text/plain')
 
 
 @route('/log/:level#[A-Z]*#/:lines#[0-9]*#')
 def log_tail(level, lines):
   bottle.response.content_type = 'text/plain'
-  return commands.getoutput('tail -%s %s/mesos-slave.%s' % (lines, log_dir, level))
+  return commands.getoutput('tail -%s %s/mesos-subordinate.%s' % (lines, log_dir, level))
 
 
 @route('/framework-logs/:fid#[0-9-]*#/:log_type#[a-z]*#')
 def framework_log_full(fid, log_type):
-  sid = get_slave().id
+  sid = get_subordinate().id
   if sid != -1:
-    dir = '%s/slave-%s/fw-%s' % (work_dir, sid, fid)
+    dir = '%s/subordinate-%s/fw-%s' % (work_dir, sid, fid)
     i = max(os.listdir(dir))
-    exec_dir = '%s/slave-%s/fw-%s/%s' % (work_dir, sid, fid, i)
+    exec_dir = '%s/subordinate-%s/fw-%s/%s' % (work_dir, sid, fid, i)
     send_file(log_type, root = exec_dir,
               guessmime = False, mimetype = 'text/plain')
   else:
-    abort(403, 'Slave not yet registered with master')
+    abort(403, 'Subordinate not yet registered with main')
 
 
 @route('/framework-logs/:fid#[0-9-]*#/:log_type#[a-z]*#/:lines#[0-9]*#')
 def framework_log_tail(fid, log_type, lines):
   bottle.response.content_type = 'text/plain'
-  sid = get_slave().id
+  sid = get_subordinate().id
   if sid != -1:
-    dir = '%s/slave-%s/fw-%s' % (work_dir, sid, fid)
+    dir = '%s/subordinate-%s/fw-%s' % (work_dir, sid, fid)
     i = max(os.listdir(dir))
-    filename = '%s/slave-%s/fw-%s/%s/%s' % (work_dir, sid, fid, i, log_type)
+    filename = '%s/subordinate-%s/fw-%s/%s/%s' % (work_dir, sid, fid, i, log_type)
     return commands.getoutput('tail -%s %s' % (lines, filename))
   else:
-    abort(403, 'Slave not yet registered with master')
+    abort(403, 'Subordinate not yet registered with main')
 
 
-bottle.TEMPLATE_PATH.append('./webui/slave/')
+bottle.TEMPLATE_PATH.append('./webui/subordinate/')
 
 # TODO(*): Add an assert to confirm that all the arguments we are
 # expecting have been passed to us, which will give us a better error

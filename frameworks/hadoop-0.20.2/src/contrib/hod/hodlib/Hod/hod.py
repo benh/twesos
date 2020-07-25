@@ -191,7 +191,7 @@ class hodRunner:
     self.__registry.start()
     self.__log.debug(self.__registry.getXMLRPCAddr())
     self.__cfg['hod']['xrs-address'] = self.__registry.getXMLRPCAddr()
-    self.__cfg['ringmaster']['svcrgy-addr'] = self.__cfg['hod']['xrs-address']
+    self.__cfg['ringmain']['svcrgy-addr'] = self.__cfg['hod']['xrs-address']
 
   def __set_cluster_state_info(self, env, hdfs, mapred, ring, jobid, min, max):
     self.__clusterStateInfo['env'] = env
@@ -228,28 +228,28 @@ class hodRunner:
          
     return opList 
   
-  def __adjustMasterFailureCountConfig(self, nodeCount):
-    # This method adjusts the ringmaster.max-master-failures variable
+  def __adjustMainFailureCountConfig(self, nodeCount):
+    # This method adjusts the ringmain.max-main-failures variable
     # to a value that is bounded by the a function of the number of
     # nodes.
 
-    maxFailures = self.__cfg['ringmaster']['max-master-failures']
-    # Count number of masters required - depends on which services
+    maxFailures = self.__cfg['ringmain']['max-main-failures']
+    # Count number of mains required - depends on which services
     # are external
-    masters = 0
+    mains = 0
     if not self.__cfg['gridservice-hdfs']['external']:
-      masters += 1
+      mains += 1
     if not self.__cfg['gridservice-mapred']['external']:
-      masters += 1
+      mains += 1
 
-    # So, if there are n nodes and m masters, we look atleast for
-    # all masters to come up. Therefore, atleast m nodes should be
-    # good, which means a maximum of n-m master nodes can fail.
-    maxFailedNodes = nodeCount - masters
+    # So, if there are n nodes and m mains, we look atleast for
+    # all mains to come up. Therefore, atleast m nodes should be
+    # good, which means a maximum of n-m main nodes can fail.
+    maxFailedNodes = nodeCount - mains
 
     # The configured max number of failures is now bounded by this
     # number.
-    self.__cfg['ringmaster']['max-master-failures'] = \
+    self.__cfg['ringmain']['max-main-failures'] = \
                               min(maxFailures, maxFailedNodes)
 
   def _op_allocate(self, args):
@@ -353,7 +353,7 @@ class hodRunner:
               raise HodInterruptException()
             self.__log.debug("Service Registry started.")
 
-            self.__adjustMasterFailureCountConfig(nodes)
+            self.__adjustMainFailureCountConfig(nodes)
             
             try:
               allocateStatus = self.__cluster.allocate(clusterDir, min, max)    
@@ -368,7 +368,7 @@ class hodRunner:
                 self.__set_cluster_state_info(os.environ, 
                                               self.__cluster.hdfsInfo, 
                                               self.__cluster.mapredInfo, 
-                                              self.__cluster.ringmasterXRS,
+                                              self.__cluster.ringmainXRS,
                                               self.__cluster.jobId,
                                               min, max)
                 self.__setup_cluster_state(clusterDir)
@@ -554,7 +554,7 @@ class hodRunner:
         self.__log.info("%s %s" % (_dict[key], clusterInfo[key]))
 
     if clusterInfo.has_key('ring'):
-      self.__log.debug("%s\t%s" % ('Ringmaster at ', clusterInfo['ring']))
+      self.__log.debug("%s\t%s" % ('Ringmain at ', clusterInfo['ring']))
     
     if self.__cfg['hod']['debug'] == 4:
       for var in clusterInfo['env'].keys():

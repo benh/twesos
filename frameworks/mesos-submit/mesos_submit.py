@@ -20,13 +20,13 @@ DEFAULT_MEM = 512
 # It then exits mesos-submit successfully, while the task goes on to run
 # the user's command.
 #
-# Note that we pass our framework ID, master URL and command to the executor
+# Note that we pass our framework ID, main URL and command to the executor
 # using the task's argument field.
 #
 # We currently don't recover if our task fails for some reason, but we
 # do print its state transitions so the user can notice this.
 class SubmitScheduler(mesos.Scheduler):
-  def __init__(self, options, master, command):
+  def __init__(self, options, main, command):
     mesos.Scheduler.__init__(self)
     if options.name != None:
       self.framework_name = options.name
@@ -34,7 +34,7 @@ class SubmitScheduler(mesos.Scheduler):
       self.framework_name = "mesos-submit " + command
     self.cpus = options.cpus
     self.mem = options.mem
-    self.master = master
+    self.main = main
     self.command = command
     self.task_launched = False
 
@@ -58,10 +58,10 @@ class SubmitScheduler(mesos.Scheduler):
         cpus = int(offer.params["cpus"])
         mem = int(offer.params["mem"])
         if cpus >= self.cpus and mem >= self.mem:
-          print "Accepting slot on slave %s (%s)" % (offer.slaveId, offer.host)
+          print "Accepting slot on subordinate %s (%s)" % (offer.subordinateId, offer.host)
           params = {"cpus": "%d" % self.cpus, "mem": "%d" % self.mem}
-          arg = [self.fid, self.framework_name, self.master, self.command]
-          task = mesos.TaskDescription(0, offer.slaveId, "task", params,
+          arg = [self.fid, self.framework_name, self.main, self.command]
+          task = mesos.TaskDescription(0, offer.subordinateId, "task", params,
                                        pickle.dumps(arg))
           driver.replyToOffer(oid, [task], {"timeout": "1"})
           self.task_launched = True
@@ -81,7 +81,7 @@ class SubmitScheduler(mesos.Scheduler):
 
 
 if __name__ == "__main__":
-  parser = OptionParser(usage="Usage: %prog [options] <master_url> <command>")
+  parser = OptionParser(usage="Usage: %prog [options] <main_url> <command>")
   parser.add_option("-c","--cpus",
                     help="number of CPUs to request (default: 1)",
                     dest="cpus", type="int", default=DEFAULT_CPUS)
@@ -94,8 +94,8 @@ if __name__ == "__main__":
   if len(args) < 2:
     parser.error("At least two parameters are required.")
     exit(2)
-  master = args[0]
+  main = args[0]
   command = " ".join(args[1:])
-  print "Connecting to mesos master %s" % master
-  sched = SubmitScheduler(options, master, command)
-  mesos.MesosSchedulerDriver(sched, master).run()
+  print "Connecting to mesos main %s" % main
+  sched = SubmitScheduler(options, main, command)
+  mesos.MesosSchedulerDriver(sched, main).run()

@@ -74,17 +74,17 @@ class MyScheduler(mesos.Scheduler):
   def registered(self, driver, fid):
     driverlog.info("Mesos torque framwork registered with frameworkID %s" % fid)
 
-  def resourceOffer(self, driver, oid, slave_offers):
+  def resourceOffer(self, driver, oid, subordinate_offers):
     self.driver = driver
     driverlog.debug("Got slot offer %d" % oid)
     self.lock.acquire()
     driverlog.debug("resourceOffer() acquired lock")
     tasks = []
-    for offer in slave_offers:
+    for offer in subordinate_offers:
       # if we haven't registered this node, accept slot & register w pbs_server
       #TODO: check to see if slot is big enough 
       if self.numToRegister <= 0:
-        driverlog.debug("Rejecting slot, no need for more slaves")
+        driverlog.debug("Rejecting slot, no need for more subordinates")
         continue
       if offer.host in self.servers.values():
         driverlog.debug("Rejecting slot, already registered node " + offer.host)
@@ -95,7 +95,7 @@ class MyScheduler(mesos.Scheduler):
       driverlog.info("Need %d more nodes, so accepting slot, setting up params for it..." % self.numToRegister)
       params = {"cpus": "1", "mem": "1024"}
       td = mesos.TaskDescription(
-          self.id, offer.slaveId, "task %d" % self.id, params, "")
+          self.id, offer.subordinateId, "task %d" % self.id, params, "")
       tasks.append(td)
       self.servers[self.id] = offer.host
       self.regComputeNode(offer.host)
@@ -150,7 +150,7 @@ class MyScheduler(mesos.Scheduler):
       monitorlog.debug(inode)
     for tid, hostname in self.servers.items():
       if len(self.servers) > MIN_SLOTS_HELD and toKill > 0 and hostname in inactiveNodes:
-        monitorlog.info("We still have to kill %d of the %d compute nodes which master is tracking" % (toKill, len(self.servers)))
+        monitorlog.info("We still have to kill %d of the %d compute nodes which main is tracking" % (toKill, len(self.servers)))
         monitorlog.info("unregistering node " + str(hostname))
         self.unregComputeNode(hostname)
         self.servers.pop(tid)
@@ -193,7 +193,7 @@ def monitor(sched):
     monitorlog.debug("\n")
 
 if __name__ == "__main__":
-  parser = OptionParser(usage = "Usage: %prog mesos_master")
+  parser = OptionParser(usage = "Usage: %prog mesos_main")
 
   (options,args) = parser.parse_args()
   if len(args) < 1:
@@ -256,7 +256,7 @@ if __name__ == "__main__":
   #ip = Popen("ifconfig en1 | awk '/inet / { print $2 }'", shell=True, stdout=PIPE).stdout.readline().rstrip() # os x
   monitorlog.info("Remembering IP address of scheduler (" + ip + "), and fqdn: " + fqdn)
 
-  monitorlog.info("Connecting to mesos master %s" % args[0])
+  monitorlog.info("Connecting to mesos main %s" % args[0])
 
   sched = MyScheduler(fqdn)
   threading.Thread(target = monitor, args=[sched]).start()

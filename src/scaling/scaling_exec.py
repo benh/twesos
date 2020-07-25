@@ -32,7 +32,7 @@ class NestedScheduler(mesos.Scheduler):
       if self.todo != self.tid:
         self.tid += 1
         pars = {"cpus": "%d" % CPUS, "mem": "%d" % MEM}
-        task = mesos.TaskDescription(self.tid, offer.slaveId,
+        task = mesos.TaskDescription(self.tid, offer.subordinateId,
                                      "task %d" % self.tid, pars,
                                      pickle.dumps(self.duration))
         tasks.append(task)
@@ -57,10 +57,10 @@ class ScalingExecutor(mesos.Executor):
 
   def launchTask(self, driver, task):
     self.tid = task.taskId
-    master, (todo, duration) = pickle.loads(task.arg)
+    main, (todo, duration) = pickle.loads(task.arg)
     scheduler = NestedScheduler(todo, duration, self)
-    print "Running here:" + master
-    self.nested_driver = mesos.MesosSchedulerDriver(scheduler, master)
+    print "Running here:" + main
+    self.nested_driver = mesos.MesosSchedulerDriver(scheduler, main)
     self.nested_driver.start()
     
   def killTask(self, driver, tid):

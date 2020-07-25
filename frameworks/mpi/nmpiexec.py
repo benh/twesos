@@ -65,7 +65,7 @@ class MyScheduler(mesos.Scheduler):
         print "Accepting slot to start mpd %d" % tid
         params = {"cpus": "%d" % CPUS, "mem": "%d" % MEM}
         td = mesos.TaskDescription(
-            tid, offer.slaveId, "task %d" % tid, params, "")
+            tid, offer.subordinateId, "task %d" % tid, params, "")
         tasks.append(td)
         self.tasksLaunched += 1
       else:
@@ -109,7 +109,7 @@ def parseIpPort(s):
   return (ip,port)
 
 if __name__ == "__main__":
-  parser = OptionParser(usage="Usage: %prog [options] mesos_master mpi_program")
+  parser = OptionParser(usage="Usage: %prog [options] mesos_main mpi_program")
   parser.add_option("-n","--num",
                     help="number of slots/mpd:s to allocate (default 1)", 
                     dest="num", type="int", default=1)
@@ -131,7 +131,7 @@ if __name__ == "__main__":
   MEM = options.mem
   MPI_TASK = " ".join(args[1:])
 
-  print "Connecting to mesos master %s" % args[0]
+  print "Connecting to mesos main %s" % args[0]
  
   try:
     call(["mpd","--daemon"])

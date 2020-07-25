@@ -24,19 +24,19 @@ from hodlib.Hod.nodePool import *
 from hodlib.Common.desc import CommandDesc
 from hodlib.Common.util import get_exception_string, parseEquals
 
-class MapReduceExternal(MasterSlave):
+class MapReduceExternal(MainSubordinate):
   """dummy proxy to external MapReduce instance"""
 
   def __init__(self, serviceDesc, workDirs, version):
-    MasterSlave.__init__(self, serviceDesc, workDirs,None)
-    self.launchedMaster = True
-    self.masterInitialized = True
+    MainSubordinate.__init__(self, serviceDesc, workDirs,None)
+    self.launchedMain = True
+    self.mainInitialized = True
     self.version = version
     
-  def getMasterRequest(self):
+  def getMainRequest(self):
     return None
 
-  def getMasterCommands(self, serviceDict):
+  def getMainCommands(self, serviceDict):
     return []
 
   def getAdminCommands(self, serviceDict):
@@ -45,7 +45,7 @@ class MapReduceExternal(MasterSlave):
   def getWorkerCommands(self, serviceDict):
     return []
 
-  def getMasterAddrs(self):
+  def getMainAddrs(self):
     attrs = self.serviceDesc.getfinalAttrs()
     addr = attrs['mapred.job.tracker']
     return [addr]
@@ -56,7 +56,7 @@ class MapReduceExternal(MasterSlave):
   def needsLess(self):
     return 0
 
-  def setMasterParams(self, dict):
+  def setMainParams(self, dict):
     self.serviceDesc['final-attrs']['mapred.job.tracker'] = "%s:%s" % (dict['host'], 
       dict['tracker_port'])
     
@@ -80,14 +80,14 @@ class MapReduceExternal(MasterSlave):
       infoaddr = attrs['mapred.job.tracker.http.address']
     return [infoaddr]
   
-class MapReduce(MasterSlave):
+class MapReduce(MainSubordinate):
 
   def __init__(self, serviceDesc, workDirs,required_node, version,
                 workers_per_ring = 1):
-    MasterSlave.__init__(self, serviceDesc, workDirs,required_node)
+    MainSubordinate.__init__(self, serviceDesc, workDirs,required_node)
 
-    self.masterNode = None
-    self.masterAddr = None
+    self.mainNode = None
+    self.mainAddr = None
     self.infoAddr = None
     self.workers = []
     self.required_node = required_node
@@ -96,15 +96,15 @@ class MapReduce(MasterSlave):
 
   def isLaunchable(self, serviceDict):
     hdfs = serviceDict['hdfs']
-    if (hdfs.isMasterInitialized()):
+    if (hdfs.isMainInitialized()):
       return True
     return False
   
-  def getMasterRequest(self):
+  def getMainRequest(self):
     req = NodeRequest(1, [], False)
     return req
 
-  def getMasterCommands(self, serviceDict):
+  def getMainCommands(self, serviceDict):
 
     hdfs = serviceDict['hdfs']
 
@@ -124,12 +124,12 @@ class MapReduce(MasterSlave):
       
     return workerCmds
 
-  def setMasterNodes(self, list):
+  def setMainNodes(self, list):
     node = list[0]
-    self.masterNode = node
+    self.mainNode = node
 
-  def getMasterAddrs(self):
-    return [self.masterAddr]
+  def getMainAddrs(self):
+    return [self.mainAddr]
 
   def getInfoAddrs(self):
     return [self.infoAddr]
@@ -140,13 +140,13 @@ class MapReduce(MasterSlave):
   def requiredNode(self):
     return self.required_host
 
-  def setMasterParams(self, list):
+  def setMainParams(self, list):
     dict = self._parseEquals(list)
-    self.masterAddr = dict['mapred.job.tracker']
-    k,v = self.masterAddr.split(":")
-    self.masterNode = k
+    self.mainAddr = dict['mapred.job.tracker']
+    k,v = self.mainAddr.split(":")
+    self.mainNode = k
     if self.version < 16:
-      self.infoAddr = self.masterNode + ':' + dict['mapred.job.tracker.info.port']
+      self.infoAddr = self.mainNode + ':' + dict['mapred.job.tracker.info.port']
     else:
       # After Hadoop-2185
       self.infoAddr = dict['mapred.job.tracker.http.address']
@@ -205,7 +205,7 @@ class MapReduce(MasterSlave):
       if 'mapred.job.tracker.http.address' not in attrs:
         attrs['mapred.job.tracker.http.address'] = 'fillinhostport'
 
-    attrs['fs.default.name'] = hdfs.getMasterAddrs()[0]
+    attrs['fs.default.name'] = hdfs.getMainAddrs()[0]
 
     self._setWorkDirs(workDirs, envs, attrs, parentDirs, 'mapred-jt')
 
@@ -229,13 +229,13 @@ class MapReduce(MasterSlave):
     workDirs = []
     attrs = sd.getfinalAttrs().copy()
     envs = sd.getEnvs().copy()
-    jt = self.masterAddr
+    jt = self.mainAddr
 
     if jt == None:
       raise ValueError, "Can't get job tracker address"
 
     attrs['mapred.job.tracker'] = jt
-    attrs['fs.default.name'] = hdfs.getMasterAddrs()[0]
+    attrs['fs.default.name'] = hdfs.getMainAddrs()[0]
 
     if self.version < 16:
       if 'tasktracker.http.port' not in attrs:

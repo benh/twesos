@@ -34,7 +34,7 @@ class MyScheduler(mesos.Scheduler):
         self.tasksLaunched += 1
         print "Accepting offer on %s to start task %d" % (offer.host, tid)
         params = {"cpus": "%d" % TASK_CPUS, "mem": "%d" % TASK_MEM}
-        td = mesos.TaskDescription(tid, offer.slaveId, "task %d" % tid,
+        td = mesos.TaskDescription(tid, offer.subordinateId, "task %d" % tid,
             params, "")
         tasks.append(td)
     driver.replyToOffer(oid, tasks, {})
